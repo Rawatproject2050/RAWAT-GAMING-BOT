@@ -22,8 +22,8 @@ from telegram.ext import (
 # ============================================================
 # CONFIG - ENVIRONMENT VARIABLES USE KARO!
 # ============================================================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_IDS_STR = os.environ.get("ADMIN_IDS", "123456789")  # comma separated
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8823466338:AAEj8pwtgZKT8ulZfQRwL3npHjCMiyCC7dw")
+ADMIN_IDS_STR = os.environ.get("ADMIN_IDS", "6665529050")  # comma separated
 ADMIN_IDS = [int(x.strip()) for x in ADMIN_IDS_STR.split(",") if x.strip().isdigit()]
 PORT = int(os.environ.get("PORT", 8080))
 
