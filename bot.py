@@ -1,34 +1,21 @@
 import os
-import asyncio
-import threading
+import sys
 import requests
 import logging
 from datetime import datetime
-from flask import Flask, request
+from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===================== CONFIG =====================
-# ⚠️ APNA NAYA TOKEN DAALO (abhi naya banao @BotFather se)
 BOT_TOKEN = "8823466338:AAGfBPBglBQHWpRZzxHH7U6_oJWV53MPoj4"
-
-# Render URL
-RENDER_URL = "https://rawat-gaming-bot.onrender.com"
-
-# Free FF API (no key needed)
 API_BASE = "https://free-ff-api-src-5plp.onrender.com/api/v1"
 # =================================================
 
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Flask app
 app = Flask(__name__)
-
-# Bot application (global)
-application = None
-bot_loop = None
 
 # ===================== FREE FIRE API =====================
 
@@ -179,61 +166,31 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error: {e}")
         await wait_msg.edit_text(f"❌ *Error:* `{str(e)}`", parse_mode="Markdown")
 
-# ===================== BOT INITIALIZATION (event loop + thread) =====================
-
-def start_bot_in_background():
-    global application, bot_loop
-
-    # Naya event loop banao
-    bot_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(bot_loop)
-
-    # Application banao — updater None (we use webhook)
-    application = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .updater(None)
-        .build()
-    )
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
-
-    # Initialize and start (ab update_queue consume karega)
-    bot_loop.run_until_complete(application.initialize())
-    bot_loop.run_until_complete(application.start())
-
-    # Webhook set karo
-    webhook_url = f"{RENDER_URL}/{BOT_TOKEN}"
-    bot_loop.run_until_complete(application.bot.set_webhook(webhook_url))
-    print(f"✅ Webhook set to: {webhook_url}")
-    print("🤖 Bot is running with webhook mode!")
-
-    # Event loop ko forever chalne do
-    bot_loop.run_forever()
-
-# ===================== FLASK ROUTES =====================
+# ===================== FLASK HEALTH CHECK =====================
 
 @app.route('/')
 def home():
     return '✅ Free Fire Info Bot is running!', 200
 
-@app.route(f'/{BOT_TOKEN}', methods=['POST'])
-def webhook():
-    """Telegram webhook endpoint — updates yahan aate hain"""
-    global application, bot_loop
-    if application and bot_loop:
-        try:
-            update = Update.de_json(request.get_json(force=True), application.bot)
-            # Update ko bot ke event loop mein daal do
-            asyncio.run_coroutine_threadsafe(
-                application.update_queue.put(update), bot_loop
-            )
-        except Exception as e:
-            logger.error(f"Webhook error: {e}")
-    return 'OK', 200
+# ===================== BOT STARTUP (Direct polling - simplest approach) =====================
 
-# ===================== BOT THREAD START =====================
+def run_bot():
+    """Bot ko polling mode mein start karo"""
+    logger.info("Starting bot in polling mode...")
+    
+    app_bot = Application.builder().token(BOT_TOKEN).build()
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
+    
+    # Webhook hatao agar pehle set tha
+    try:
+        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+    except:
+        pass
+    
+    logger.info("✅ Bot started! Waiting for messages...")
+    app_bot.run_polling()
 
-# Bot ko ek alag thread mein start karo taaki Flask + gunicorn saath chale
-bot_thread = threading.Thread(target=start_bot_in_background, daemon=True)
-bot_thread.start()
+# Ye tabhi chalega jab yeh script direct run ho rahi ho (gunicorn ke saath nahi)
+if __name__ == "__main__":
+    run_bot()
