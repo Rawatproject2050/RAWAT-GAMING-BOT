@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ===================== CONFIG =====================
 # ⚠️ APNA NAYA BOT TOKEN DAALO
-BOT_TOKEN = "8823466338:AAHlfgOB4xxwpVpPCSYeUnjX6uzOSwoYR-U"
+BOT_TOKEN = "8823466338:AAGfBPBglBQHWpRZzxHH7U6_oJWV53MPoj4"
 
 # Render ka URL (https://rawat-gaming-bot.onrender.com)
 RENDER_URL = "https://rawat-gaming-bot.onrender.com"
