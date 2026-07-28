@@ -1,5 +1,5 @@
 import os
-import sys
+import threading
 import requests
 import logging
 from datetime import datetime
@@ -15,6 +15,7 @@ API_BASE = "https://free-ff-api-src-5plp.onrender.com/api/v1"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Flask app for Render health check
 app = Flask(__name__)
 
 # ===================== FREE FIRE API =====================
@@ -172,25 +173,32 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def home():
     return '✅ Free Fire Info Bot is running!', 200
 
-# ===================== BOT STARTUP (Direct polling - simplest approach) =====================
+# ===================== RUN FLASK IN BACKGROUND =====================
 
-def run_bot():
-    """Bot ko polling mode mein start karo"""
+def run_flask():
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
+# ===================== MAIN =====================
+
+if __name__ == "__main__":
+    # Flask ko alag thread mein chalayenge (Render health check ke liye)
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info(f"Flask started on port {os.environ.get('PORT', 8000)}")
+
+    # Bot polling mode mein chalayenge
     logger.info("Starting bot in polling mode...")
     
     app_bot = Application.builder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
     
-    # Webhook hatao agar pehle set tha
+    # Pehle se koi webhook set hai to hatao
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
     except:
         pass
-    
-    logger.info("✅ Bot started! Waiting for messages...")
-    app_bot.run_polling()
 
-# Ye tabhi chalega jab yeh script direct run ho rahi ho (gunicorn ke saath nahi)
-if __name__ == "__main__":
-    run_bot()
+    logger.info("✅ Bot is running! Waiting for messages...")
+    app_bot.run_polling()
