@@ -16,13 +16,11 @@ API_BASE = "https://free-ff-api-src-5plp.onrender.com/api/v1"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Flask app for Render health check
 app = Flask(__name__)
 
 # ===================== FREE FIRE API =====================
 
 def fetch_ff_data(uid):
-    """Synchronous function running inside an async thread executor"""
     regions = ["IND", "SG", "BR", "BD", "PK"]
     for region in regions:
         try:
@@ -98,7 +96,7 @@ def format_player_info(data, uid):
 ╭━⟮ 👤 Bᴀꜱɪᴄ Iɴꜰᴏ ⟯
 │ 😺 Nᴀᴍᴇ: {nickname}
 │ 🆔 Uɪᴅ: {uid}
-│ 🌍 Rᴇɢɪᴏɴ: {region}
+│ 🌍 RᴇɢɪᴏN: {region}
 │ 🏆 Lᴇᴠᴇʟ: {level}
 │ ⭐ Exᴘ: {exp}
 │ ❤️ Lɪᴋᴇꜱ: {likes}
@@ -109,7 +107,7 @@ def format_player_info(data, uid):
 │ 💎 Dɪᴀᴍᴏɴᴅ Cᴏꜱᴛ: {diamond_cost}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🏅 RᴀɴRank Iɴꜰᴏ ⟯
+╭━⟮ 🏅 Rᴀɴᴋ Iɴꜰᴏ ⟯
 │ 🎯 Bʀ Rᴀɴᴋ: {rank_br}
 │ 🏆 Bʀ Hɪɢʜᴇꜱᴛ Rᴀɴᴋ: {rank_br_high}
 │ 🎯 Bʀ Pᴏɪɴᴛꜱ: {br_points}
@@ -124,7 +122,7 @@ def format_player_info(data, uid):
 │ 🎮 Pʀᴇꜰᴇʀʀᴇᴅ Mᴏᴅᴇ: {pref_mode}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🏰 Gᴜɪʟᴅ Iɴꜰᴏ ⟯
+╭━⟮ 🏰 GᴜɪLᴅ Iɴꜰᴏ ⟯
 │ 🏯 Nᴀᴍᴇ: {guild_name}
 │ 🆔 Gᴜɪʟᴅ Iᴅ: {guild_id}
 │ 📶 Lᴇᴠᴇʟ: {guild_level}
@@ -161,10 +159,9 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     wait_msg = await update.message.reply_text("⏳ *Fetching player info...*", parse_mode="Markdown")
     try:
-        # Run synchronous HTTP request off the main thread
         data = await asyncio.to_thread(fetch_ff_data, uid)
         if not data:
-            await wait_msg.edit_text("❌ *Player not found or API down!*", parse_mode="Markdown")
+            await wait_msg.edit_text("❌ *Player not found or API limits exceeded!*", parse_mode="Markdown")
             return
         formatted = format_player_info(data, uid)
         await wait_msg.edit_text(formatted, parse_mode="Markdown")
@@ -185,20 +182,17 @@ def run_flask():
 # ===================== MAIN =====================
 
 if __name__ == "__main__":
-    # Start Web server for Render health checks
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
-    # Clear Webhook to allow polling without conflicts
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", timeout=5)
     except:
         pass
 
-    # Build and start Telegram Bot
     app_bot = Application.builder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
     
-    logger.info("✅ Starting Bot Polling...")
+    logger.info("✅ Bot successfully initialized! Starting polling...")
     app_bot.run_polling(drop_pending_updates=True)
