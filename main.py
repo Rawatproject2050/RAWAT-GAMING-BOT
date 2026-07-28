@@ -4,19 +4,19 @@ import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Logging setup (Render logs mein errors dekhne ke liye)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# Render environment variables se token fetch karega (Safe & Secure)
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-# Free Fire Info API
-API_URL = "https://free-fire-virtex-api.vercel.app/info"
+# Working Free Fire API Endpoints
+API_ENDPOINTS = [
+    "https://glob-info2.vercel.app/info",
+    "https://free-fire-virtex-api.vercel.app/info"
+]
 
-# Supported Regions Mapping
 SUPPORTED_REGIONS = {
     "ind": "India 🇮🇳",
     "pk": "Pakistan 🇵🇰",
@@ -31,7 +31,6 @@ SUPPORTED_REGIONS = {
     "cis": "Europe / CIS 🇪🇺"
 }
 
-# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "👋 **Welcome to Free Fire Info Bot!**\n\n"
@@ -43,7 +42,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
-# /info command
 async def id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
@@ -58,15 +56,13 @@ async def id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(help_msg, parse_mode="Markdown")
         return
 
-    # Auto-detect Region & UID
     if len(args) == 1:
-        region = "ind"  # Default India
+        region = "ind"
         uid = args[0]
     else:
         region = args[0].lower()
         uid = args[1]
 
-    # Region Check
     if region not in SUPPORTED_REGIONS:
         await update.message.reply_text(
             f"❌ Invalid region code `{region}`!\n"
@@ -78,36 +74,41 @@ async def id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     region_name = SUPPORTED_REGIONS[region]
     await update.message.reply_text(f"🔍 Fetching details for UID: `{uid}` ({region_name})...", parse_mode="Markdown")
 
-    try:
-        response = requests.get(f"{API_URL}?uid={uid}&region={region}", timeout=10)
-        data = response.json()
+    data = None
+    # Try endpoints sequentially if one fails
+    for api_url in API_ENDPOINTS:
+        try:
+            response = requests.get(f"{api_url}?uid={uid}&region={region}", timeout=8)
+            if response.status_code == 200:
+                json_res = response.json()
+                if "basicInfo" in json_res or "AccountInfo" in json_res:
+                    data = json_res
+                    break
+        except Exception:
+            continue
 
-        if response.status_code == 200 and "basicInfo" in data:
-            basic = data.get("basicInfo", {})
-            clan = data.get("clanBasicInfo", {})
+    if data:
+        basic = data.get("basicInfo") or data.get("AccountInfo") or {}
+        clan = data.get("clanBasicInfo") or data.get("GuildInfo") or {}
 
-            # Formatting Message
-            message = (
-                f"🎮 **FREE FIRE PLAYER PROFILE**\n"
-                f"───────────────\n"
-                f"👤 **Name:** {basic.get('nickname', 'N/A')}\n"
-                f"🆔 **UID:** `{uid}`\n"
-                f"🌍 **Server:** {region_name}\n"
-                f"⭐ **Level:** {basic.get('level', 'N/A')} (EXP: {basic.get('exp', 'N/A')})\n"
-                f"👍 **Likes:** {basic.get('liked', 'N/A')}\n"
-                f"🏆 **BR Rank Points:** {basic.get('rankingPoints', 'N/A')}\n"
-                f"💥 **CS Rank Points:** {basic.get('csRankingPoints', 'N/A')}\n\n"
-                f"🛡️ **GUILD DETAILS**\n"
-                f"🏰 **Guild Name:** {clan.get('clanName', 'No Guild')}\n"
-                f"👑 **Leader UID:** `{clan.get('leaderId', 'N/A')}`\n"
-                f"───────────────"
-            )
-            await update.message.reply_text(message, parse_mode="Markdown")
-        else:
-            await update.message.reply_text(f"⚠️ UID `{uid}` {region_name} server par nahi mili ya API down hai.", parse_mode="Markdown")
-
-    except Exception:
-        await update.message.reply_text("❌ Connection Error! Kripya thodi der baad try karein.")
+        message = (
+            f"🎮 **FREE FIRE PLAYER PROFILE**\n"
+            f"───────────────\n"
+            f"👤 **Name:** {basic.get('nickname', basic.get('AccountName', 'N/A'))}\n"
+            f"🆔 **UID:** `{uid}`\n"
+            f"🌍 **Server:** {region_name}\n"
+            f"⭐ **Level:** {basic.get('level', basic.get('AccountLevel', 'N/A'))}\n"
+            f"👍 **Likes:** {basic.get('liked', basic.get('AccountLikes', 'N/A'))}\n"
+            f"🏆 **BR Rank Points:** {basic.get('rankingPoints', 'N/A')}\n"
+            f"💥 **CS Rank Points:** {basic.get('csRankingPoints', 'N/A')}\n\n"
+            f"🛡️ **GUILD DETAILS**\n"
+            f"🏰 **Guild Name:** {clan.get('clanName', clan.get('GuildName', 'No Guild'))}\n"
+            f"👑 **Leader UID:** `{clan.get('leaderId', clan.get('GuildLeaderID', 'N/A'))}`\n"
+            f"───────────────"
+        )
+        await update.message.reply_text(message, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(f"⚠️ UID `{uid}` ki details nahi mil payi. Server API response nahi de raha hai.", parse_mode="Markdown")
 
 def main():
     if not BOT_TOKEN:
@@ -115,7 +116,6 @@ def main():
         return
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", id_info))
     
