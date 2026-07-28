@@ -1,15 +1,29 @@
 import os
 import logging
+import threading
 import requests
+from flask import Flask
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
+# Logging Setup
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+
+# Dummy Web Server (Render Free Web Service ke liye compulsory hai)
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "Bot status: ONLINE 24/7!"
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host='0.0.0.0', port=port)
 
 # Working Free Fire API Endpoints
 API_ENDPOINTS = [
@@ -75,7 +89,6 @@ async def id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🔍 Fetching details for UID: `{uid}` ({region_name})...", parse_mode="Markdown")
 
     data = None
-    # Try endpoints sequentially if one fails
     for api_url in API_ENDPOINTS:
         try:
             response = requests.get(f"{api_url}?uid={uid}&region={region}", timeout=8)
@@ -115,11 +128,15 @@ def main():
         print("❌ ERROR: BOT_TOKEN Environment Variable nahi mila!")
         return
 
+    # Render web server ko alag thread par start karein
+    threading.Thread(target=run_web_server, daemon=True).start()
+
+    # Telegram bot polling start
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", id_info))
     
-    print("🤖 Bot started successfully...")
+    print("🤖 Bot started successfully on Web Service...")
     app.run_polling()
 
 if __name__ == '__main__':
