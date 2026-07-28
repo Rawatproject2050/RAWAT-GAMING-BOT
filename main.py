@@ -14,22 +14,16 @@ logging.basicConfig(
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-# Dummy Web Server (Render Free Web Service ke liye compulsory hai)
+# Render web server to keep the service active
 web_app = Flask(__name__)
 
 @web_app.route('/')
 def home():
-    return "Bot status: ONLINE 24/7!"
+    return "Bot is active 24/7!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
-
-# Working Free Fire API Endpoints
-API_ENDPOINTS = [
-    "https://glob-info2.vercel.app/info",
-    "https://free-fire-virtex-api.vercel.app/info"
-]
 
 SUPPORTED_REGIONS = {
     "ind": "India 🇮🇳",
@@ -47,7 +41,7 @@ SUPPORTED_REGIONS = {
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "👋 **Welcome to Free Fire Info Bot!**\n\n"
+        "👋 **Welcome to RAWAT GAMING BOT!**\n\n"
         "Aap kisi bhi Free Fire player ki UID ki details check kar sakte hain.\n\n"
         "📌 **Kaise use karein:**\n"
         "• India Server: `/info 123456789`\n"
@@ -88,55 +82,71 @@ async def id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     region_name = SUPPORTED_REGIONS[region]
     await update.message.reply_text(f"🔍 Fetching details for UID: `{uid}` ({region_name})...", parse_mode="Markdown")
 
+    # Updated Multiple Live APIs
+    api_urls = [
+        f"https://free-fire-api-three.vercel.app/info?uid={uid}&region={region}",
+        f"https://ff-api-ind.vercel.app/api/info?uid={uid}&region={region}",
+        f"https://api.vytal.dev/ff?uid={uid}&region={region}"
+    ]
+
     data = None
-    for api_url in API_ENDPOINTS:
+    for url in api_urls:
         try:
-            response = requests.get(f"{api_url}?uid={uid}&region={region}", timeout=8)
-            if response.status_code == 200:
-                json_res = response.json()
-                if "basicInfo" in json_res or "AccountInfo" in json_res:
-                    data = json_res
+            res = requests.get(url, timeout=7)
+            if res.status_code == 200:
+                json_data = res.json()
+                if "basicInfo" in json_data or "AccountInfo" in json_data or "nickname" in json_data:
+                    data = json_data
                     break
         except Exception:
             continue
 
     if data:
-        basic = data.get("basicInfo") or data.get("AccountInfo") or {}
+        # Extracting details smoothly across different API responses
+        basic = data.get("basicInfo") or data.get("AccountInfo") or data
         clan = data.get("clanBasicInfo") or data.get("GuildInfo") or {}
+
+        name = basic.get('nickname') or basic.get('AccountName') or basic.get('Name') or 'N/A'
+        level = basic.get('level') or basic.get('AccountLevel') or basic.get('Level') or 'N/A'
+        likes = basic.get('liked') or basic.get('AccountLikes') or basic.get('Likes') or 'N/A'
+        exp = basic.get('exp') or basic.get('AccountEXP') or 'N/A'
+        br_points = basic.get('rankingPoints') or basic.get('BRRankPoint') or 'N/A'
+        cs_points = basic.get('csRankingPoints') or basic.get('CSRankPoint') or 'N/A'
+
+        guild_name = clan.get('clanName') or clan.get('GuildName') or 'No Guild'
+        guild_leader = clan.get('leaderId') or clan.get('GuildLeaderID') or 'N/A'
 
         message = (
             f"🎮 **FREE FIRE PLAYER PROFILE**\n"
             f"───────────────\n"
-            f"👤 **Name:** {basic.get('nickname', basic.get('AccountName', 'N/A'))}\n"
+            f"👤 **Name:** {name}\n"
             f"🆔 **UID:** `{uid}`\n"
             f"🌍 **Server:** {region_name}\n"
-            f"⭐ **Level:** {basic.get('level', basic.get('AccountLevel', 'N/A'))}\n"
-            f"👍 **Likes:** {basic.get('liked', basic.get('AccountLikes', 'N/A'))}\n"
-            f"🏆 **BR Rank Points:** {basic.get('rankingPoints', 'N/A')}\n"
-            f"💥 **CS Rank Points:** {basic.get('csRankingPoints', 'N/A')}\n\n"
+            f"⭐ **Level:** {level} (EXP: {exp})\n"
+            f"👍 **Likes:** {likes}\n"
+            f"🏆 **BR Rank Points:** {br_points}\n"
+            f"💥 **CS Rank Points:** {cs_points}\n\n"
             f"🛡️ **GUILD DETAILS**\n"
-            f"🏰 **Guild Name:** {clan.get('clanName', clan.get('GuildName', 'No Guild'))}\n"
-            f"👑 **Leader UID:** `{clan.get('leaderId', clan.get('GuildLeaderID', 'N/A'))}`\n"
+            f"🏰 **Guild Name:** {guild_name}\n"
+            f"👑 **Leader UID:** `{guild_leader}`\n"
             f"───────────────"
         )
         await update.message.reply_text(message, parse_mode="Markdown")
     else:
-        await update.message.reply_text(f"⚠️ UID `{uid}` ki details nahi mil payi. Server API response nahi de raha hai.", parse_mode="Markdown")
+        await update.message.reply_text(f"⚠️ UID `{uid}` ki details nahi mili. Kripya check karein ki UID sahi hai ya thodi der baad try karein.", parse_mode="Markdown")
 
 def main():
     if not BOT_TOKEN:
         print("❌ ERROR: BOT_TOKEN Environment Variable nahi mila!")
         return
 
-    # Render web server ko alag thread par start karein
     threading.Thread(target=run_web_server, daemon=True).start()
 
-    # Telegram bot polling start
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", id_info))
     
-    print("🤖 Bot started successfully on Web Service...")
+    print("🤖 Bot running on Render Web Service...")
     app.run_polling()
 
 if __name__ == '__main__':
