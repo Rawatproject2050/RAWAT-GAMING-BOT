@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 # Flask app for Render health check
 app = Flask(__name__)
 
+# Helper function to format numbers with commas (e.g., 14314 -> 14,314)
+def fmt_num(val):
+    if val is None or val == "?" or val == "":
+        return "?"
+    try:
+        return f"{int(val):,}"
+    except (ValueError, TypeError):
+        return str(val)
+
 # ===================== FREE FIRE API =====================
 
 def get_player_info(uid):
@@ -62,16 +71,16 @@ def format_player_info(data, uid):
 
     nickname       = basic.get("nickname", "Unknown")
     level          = basic.get("level", "?")
-    likes          = basic.get("liked", basic.get("likeCount", "?"))
-    exp            = basic.get("exp", basic.get("experience", "?"))
-    badges         = data.get("badgeCount", data.get("badges", "?"))
+    likes          = fmt_num(basic.get("liked", basic.get("likeCount", "?")))
+    exp            = fmt_num(basic.get("exp", basic.get("experience", "?")))
+    badges         = fmt_num(data.get("badgeCount", data.get("badges", "?")))
     ob_version     = data.get("obVersion", "OB54")
-    rank_br        = basic.get("rank", "?")
-    rank_br_high   = data.get("highestRank", basic.get("highestRank", rank_br))
-    br_points      = basic.get("rankPoint", data.get("brPoints", "?"))
-    cs_rank        = data.get("csRank", "?")
-    cs_rank_high   = data.get("csHighestRank", "?")
-    cs_points      = data.get("csPoints", "?")
+    rank_br        = fmt_num(basic.get("rank", "?"))
+    rank_br_high   = fmt_num(data.get("highestRank", basic.get("highestRank", rank_br)))
+    br_points      = fmt_num(basic.get("rankPoint", data.get("brPoints", "?")))
+    cs_rank        = fmt_num(data.get("csRank", "?"))
+    cs_rank_high   = fmt_num(data.get("csHighestRank", "?"))
+    cs_points      = fmt_num(data.get("csPoints", "?"))
     bio            = data.get("signature", social.get("signature", "No Bio"))
     language       = social.get("language", data.get("language", "Language_EN"))
     pref_mode      = social.get("preferredMode", data.get("preferredMode", "ModePrefer_BR"))
@@ -83,10 +92,10 @@ def format_player_info(data, uid):
     gc_uid         = captain.get("accountId", "?")
     pet_name       = pet.get("name", "None")
     pet_level      = pet.get("level", "?")
-    pet_exp        = pet.get("exp", pet.get("experience", "?"))
-    credit_score   = credit.get("score", "?")
+    pet_exp        = fmt_num(pet.get("exp", pet.get("experience", "?")))
+    credit_score   = fmt_num(credit.get("score", "?"))
     credit_reward  = credit.get("rewardState", credit.get("reward", "?"))
-    diamond_cost   = data.get("diamondCost", "?")
+    diamond_cost   = fmt_num(data.get("diamondCost", "?"))
 
     return f"""╭━━━━━━━━━━━━━━━━━━━━✪
 │  🎮 Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ
@@ -145,13 +154,25 @@ def format_player_info(data, uid):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 *Welcome to Free Fire Info Bot!*\n\n"
-        "Simply send me a Free Fire UID to get full player details.\n\n"
+        "You can send a Free Fire UID directly OR use the command:\n"
+        "`/info 2722004155`\n\n"
         "Example: `2722004155`",
         parse_mode="Markdown"
     )
 
+async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("❌ *Please provide a UID!*\nExample: `/info 2722004155`", parse_mode="Markdown")
+        return
+    
+    uid = context.args[0].strip()
+    await process_uid(update, uid)
+
 async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.message.text.strip()
+    await process_uid(update, uid)
+
+async def process_uid(update: Update, uid: str):
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
         await update.message.reply_text("❌ *Invalid UID!*", parse_mode="Markdown")
         return
@@ -184,14 +205,12 @@ def run_flask():
 
 if __name__ == "__main__":
     if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN is missing! Please set Environment Variable.")
+        logger.error("❌ BOT_TOKEN is missing!")
         exit(1)
 
-    # Flask ko bg thread mein chalayenge
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
-    # Pehle se koi webhook set hai to hatao
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
     except Exception:
@@ -199,6 +218,10 @@ if __name__ == "__main__":
 
     logger.info("✅ Bot is starting in polling mode...")
     app_bot = Application.builder().token(BOT_TOKEN).build()
+    
+    # Handlers
     app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CommandHandler("info", info_command))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
+    
     app_bot.run_polling()
