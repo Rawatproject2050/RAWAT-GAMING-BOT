@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # ===================== CONFIGURATION =====================
 # ⚠️ YAHAN APNA NAYA BOT TOKEN DAALO (purana revoke karke naya banao)
-BOT_TOKEN = "YOUR_NEW_BOT_TOKEN_HERE"
+BOT_TOKEN = "8823466338:AAHlfgOB4xxwpVpPCSYeUnjX6uzOSwoYR-U"
 
 # Teri personal Telegram ID
 OWNER_ID = 6665529050
