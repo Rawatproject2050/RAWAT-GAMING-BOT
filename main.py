@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ===================== CONFIG =====================
 # Render Environment Variables se Token uthayega
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
-API_BASE = "https://freefire-api-info.vercel.app/api/v1"
+API_BASE = "https://freefireinfo.nepcoderapis.workers.dev"
 # =================================================
 
 logging.basicConfig(level=logging.INFO)
