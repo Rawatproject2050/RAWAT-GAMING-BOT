@@ -2,6 +2,7 @@ import os
 import threading
 import requests
 import logging
+import asyncio
 from datetime import datetime
 from flask import Flask
 from telegram import Update
@@ -20,17 +21,20 @@ app = Flask(__name__)
 
 # ===================== FREE FIRE API =====================
 
-def get_player_info(uid):
+def fetch_ff_data(uid):
+    """Synchronous function running inside an async thread executor"""
     regions = ["IND", "SG", "BR", "BD", "PK"]
     for region in regions:
         try:
             url = f"{API_BASE}/account?region={region}&uid={uid}"
-            resp = requests.get(url, timeout=10)
-            data = resp.json()
-            if "error" not in data and "basicInfo" in data:
-                data["region"] = region
-                return data
-        except:
+            resp = requests.get(url, timeout=8)
+            if resp.status_code == 200:
+                data = resp.json()
+                if "error" not in data and "basicInfo" in data:
+                    data["region"] = region
+                    return data
+        except Exception as e:
+            logger.error(f"Error fetching for region {region}: {e}")
             continue
     return None
 
@@ -43,7 +47,7 @@ def format_player_info(data, uid):
     credit = data.get("creditScore", {})
     region = data.get("region", basic.get("region", "IND"))
 
-    create_time = ""
+    create_time = "Unknown"
     if "accountCreateTime" in data:
         try:
             ts = int(data["accountCreateTime"])
@@ -51,7 +55,7 @@ def format_player_info(data, uid):
         except:
             create_time = str(data.get("accountCreateTime", "Unknown"))
 
-    last_login = ""
+    last_login = "Unknown"
     if "lastLoginTime" in data:
         try:
             ts = int(data["lastLoginTime"])
@@ -105,7 +109,7 @@ def format_player_info(data, uid):
 │ 💎 Dɪᴀᴍᴏɴᴅ Cᴏꜱᴛ: {diamond_cost}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🏅 Rᴀɴᴋ Iɴꜰᴏ ⟯
+╭━⟮ 🏅 RᴀɴRank Iɴꜰᴏ ⟯
 │ 🎯 Bʀ Rᴀɴᴋ: {rank_br}
 │ 🏆 Bʀ Hɪɢʜᴇꜱᴛ Rᴀɴᴋ: {rank_br_high}
 │ 🎯 Bʀ Pᴏɪɴᴛꜱ: {br_points}
@@ -157,14 +161,15 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     wait_msg = await update.message.reply_text("⏳ *Fetching player info...*", parse_mode="Markdown")
     try:
-        data = get_player_info(uid)
+        # Run synchronous HTTP request off the main thread
+        data = await asyncio.to_thread(fetch_ff_data, uid)
         if not data:
-            await wait_msg.edit_text("❌ *Player not found!*", parse_mode="Markdown")
+            await wait_msg.edit_text("❌ *Player not found or API down!*", parse_mode="Markdown")
             return
         formatted = format_player_info(data, uid)
         await wait_msg.edit_text(formatted, parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error handling UID: {e}")
         await wait_msg.edit_text(f"❌ *Error:* `{str(e)}`", parse_mode="Markdown")
 
 # ===================== FLASK HEALTH CHECK =====================
@@ -173,8 +178,6 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def home():
     return '✅ Free Fire Info Bot is running!', 200
 
-# ===================== RUN FLASK IN BACKGROUND =====================
-
 def run_flask():
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
@@ -182,23 +185,20 @@ def run_flask():
 # ===================== MAIN =====================
 
 if __name__ == "__main__":
-    # Flask ko alag thread mein chalayenge (Render health check ke liye)
+    # Start Web server for Render health checks
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    logger.info(f"Flask started on port {os.environ.get('PORT', 8000)}")
 
-    # Bot polling mode mein chalayenge
-    logger.info("Starting bot in polling mode...")
-    
+    # Clear Webhook to allow polling without conflicts
+    try:
+        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", timeout=5)
+    except:
+        pass
+
+    # Build and start Telegram Bot
     app_bot = Application.builder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
     
-    # Pehle se koi webhook set hai to hatao
-    try:
-        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
-    except:
-        pass
-
-    logger.info("✅ Bot is running! Waiting for messages...")
-    app_bot.run_polling()
+    logger.info("✅ Starting Bot Polling...")
+    app_bot.run_polling(drop_pending_updates=True)
