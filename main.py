@@ -179,24 +179,62 @@ def format_player_info(data, uid):
 │ 🎁 <b>Reward State:</b> {credit_reward}
 ╰━━━━━━━━━━━━━━━✪</blockquote>"""
 
-# ===================== BOT HANDLERS =====================
+# ===================== BOT HANDLERS & ANALYTICS =====================
+
+# Admin Configuration
+ADMIN_ID = 6665529050  # 👈 Yaha apna Numeric Telegram ID daalein (e.g. 583920194)
+ADMIN_USERNAME = "@the_rawat_boy_official"
+
+# Memory Storage for Bot Statistics
+user_data_store = {}
+connected_groups = set()
+
+# Helper function to track active users
+def track_user(user, chat_type):
+    user_id = user.id
+    first_name = user.first_name or ""
+    last_name = user.last_name or ""
+    full_name = f"{first_name} {last_name}".strip()
+    username = f"@{user.username}" if user.username else "No Username"
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if user_id not in user_data_store:
+        user_data_store[user_id] = {
+            "name": full_name,
+            "username": username,
+            "joined_at": current_time,
+            "last_active": current_time,
+            "chat_type": chat_type
+        }
+    else:
+        user_data_store[user_id]["last_active"] = current_time
+        user_data_store[user_id]["name"] = full_name
+        user_data_store[user_id]["username"] = username
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_type = update.effective_chat.type
+    track_user(user, chat_type)
+
+    if chat_type in ['group', 'supergroup']:
+        connected_groups.add(update.effective_chat.title or str(update.effective_chat.id))
+
     welcome_text = (
         "<b>❤ ── [ RAWAT FF INFO BOT ] ── ❤</b>\n\n"
-        "<b>👋 Welcome to RAWAT FF INFO BOT!</b>\n"
+        f"<b>👋 Welcome {html.escape(user.first_name)}!</b>\n"
         "<i>Your Ultimate Free Fire Player Analytics Partner.</i>\n\n"
         "<blockquote>⚡ <b>HOW TO USE THE BOT</b>\n\n"
-        "1️⃣ <b>Direct Search:</b> Just send any Free Fire UID directly in this chat.\n"
-        "2️⃣ <b>Command Search:</b> Use the command format below:\n"
-        "   👉 <code>/info 2722004155</code>\n\n"
-        "✨ <b>Features:</b> Real-time Profile Info, Rank & Points, Guild Details, Pet Stats, Account Creation Date, Last Login & Credit Score.</blockquote>\n\n"
-        "📌 <i>Send a UID right now to fetch player stats!</i>"
+        "1️⃣ <b>Direct Search:</b> Direct kisi ki FF UID bhejo.\n"
+        "2️⃣ <b>Command Search:</b> Type karein: <code>/info 2722004155</code>\n"
+        "3️⃣ <b>Admin Contact:</b> Owner se baat karne ke liye type karein: <code>/bot_admin</code></blockquote>\n\n"
+        "📌 <i>Type box me '/' dabayein sabhi commands dekhne ke liye!</i>"
     )
-    
     await update.message.reply_text(welcome_text, parse_mode="HTML")
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    track_user(user, update.effective_chat.type)
+
     if not context.args:
         await update.message.reply_text("❌ <b>Please provide a UID!</b>\nExample: <code>/info 2722004155</code>", parse_mode="HTML")
         return
@@ -204,7 +242,58 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = context.args[0].strip()
     await process_uid(update, uid)
 
+async def bot_admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    track_user(user, update.effective_chat.type)
+
+    admin_msg = (
+        "<b>👑 BOT ADMIN & OWNER INFO</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "Agar aapko koi help, issue ya bot me modification chahiye to contact karein:\n\n"
+        f"👤 <b>Owner:</b> {ADMIN_USERNAME}\n"
+        f"💬 <b>Direct DM:</b> https://t.me/the_rawat_boy_official"
+    )
+    await update.message.reply_text(admin_msg, parse_mode="HTML", disable_web_page_preview=True)
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    
+    # Admin Access Control
+    if user.id != ADMIN_ID:
+        await update.message.reply_text("❌ <b>Yeh command sirf Bot Owner ke liye reserved hai!</b>", parse_mode="HTML")
+        return
+
+    total_users = len(user_data_store)
+    total_groups = len(connected_groups)
+
+    # Top 5 Recent Users List
+    recent_users = list(user_data_store.items())[-5:]
+    recent_users.reverse()
+    
+    recent_text = ""
+    for idx, (uid, info) in enumerate(recent_users, 1):
+        recent_text += f"{idx}. <b>{html.escape(info['name'])}</b> ({info['username']})\n   └ UID: <code>{uid}</code> | Active: <i>{info['last_active']}</i>\n"
+
+    groups_text = "\n".join([f"• {g}" for g in connected_groups]) if connected_groups else "Kisi group me added nahi hai."
+
+    dashboard = (
+        "<b>📊 BOT FULL ANALYTICS DASHBOARD</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👥 <b>Total Users Tracked:</b> {total_users}\n"
+        f"🏢 <b>Total Active Groups:</b> {total_groups}\n\n"
+        f"📋 <b>Recent Active Users:</b>\n{recent_text or 'Koi user data nahi hai.'}\n"
+        f"🏰 <b>Connected Groups:</b>\n{groups_text}"
+    )
+    await update.message.reply_text(dashboard, parse_mode="HTML")
+
 async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_type = update.effective_chat.type
+    track_user(user, chat_type)
+
+    if chat_type in ['group', 'supergroup']:
+        connected_groups.add(update.effective_chat.title or str(update.effective_chat.id))
+
     uid = update.message.text.strip()
     await process_uid(update, uid)
 
@@ -225,6 +314,15 @@ async def process_uid(update: Update, uid: str):
         logger.error(f"Error: {e}")
         await wait_msg.edit_text(f"❌ <b>Error:</b> <code>{html.escape(str(e))}</code>", parse_mode="HTML")
 
+# Function to Set Telegram Bot Menu Commands (Popup '/' Menu)
+async def post_init(application: Application):
+    bot_commands = [
+        ("start", "Bot ko restart karein"),
+        ("info", "Player ID check karein (/info <UID>)"),
+        ("bot_admin", "Contact Bot Owner (@the_rawat_boy_official)")
+    ]
+    await application.bot.set_my_commands(bot_commands)
+
 def run_flask():
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
@@ -237,6 +335,24 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
+    try:
+        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+    except Exception:
+        pass
+
+    logger.info("✅ Bot is starting in polling mode...")
+    
+    # Build Bot with post_init to register '/' menu
+    app_bot = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    
+    # Register Handlers
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CommandHandler("info", info_command))
+    app_bot.add_handler(CommandHandler("bot_admin", bot_admin_command))
+    app_bot.add_handler(CommandHandler("stats", stats_command))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
+    
+    app_bot.run_polling()
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
     except Exception:
