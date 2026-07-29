@@ -127,7 +127,9 @@ def format_player_info(data, uid):
     credit_reward  = safe_str(credit.get("rewardState") or credit.get("reward") or "?")
     diamond_cost   = safe_str(fmt_num(data.get("diamondCost") or "?"))
 
-    return f"""━⟮ 🎮 <b>FREE FIRE PLAYER INFO</b>  ⟯━
+    return f"""╭━━━━━━━━━━━━━━━━━━━━✪
+│  🎮 Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ
+╰━━━━━━━━━━━━━━━━━━━━✪
 
 <blockquote>╭━⟮ 👤 <b>Basic Info</b> ⟯
 │ 😺 <b>Name:</b> {nickname}
