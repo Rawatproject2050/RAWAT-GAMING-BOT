@@ -9,9 +9,6 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===================== RENDER ENV CONFIG =====================
-# Render Environment Variables:
-# 1. BOT_TOKEN = (Aapka Telegram Bot Token)
-# 2. API_KEY   = FFINFO-Free
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 API_KEY = os.getenv("API_KEY", "FFINFO-Free")
 # =============================================================
@@ -19,19 +16,16 @@ API_KEY = os.getenv("API_KEY", "FFINFO-Free")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Flask app for Render health check
 app = Flask(__name__)
 
-# Helper function to format numbers with commas
 def fmt_num(val):
-    if val is None or val == "?" or val == "" or str(val) == "0":
+    if val is None or val == "?" or val == "" or val == "0":
         return "?"
     try:
         return f"{int(val):,}"
     except (ValueError, TypeError):
         return str(val)
 
-# Helper function to escape HTML special characters to prevent Telegram Parse Error
 def safe_str(text):
     if text is None or text == "":
         return "?"
@@ -99,7 +93,11 @@ def format_player_info(data, uid):
     level          = safe_str(basic.get("level") or data.get("level") or "?")
     likes          = safe_str(fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?"))
     exp            = safe_str(fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?"))
-    badges         = safe_str(fmt_num(data.get("badgeCount") or data.get("badges") or basic.get("badgeCount") or data.get("badge")))
+    
+    # Badges extraction
+    badges_val     = data.get("badgeCount") or data.get("badges") or basic.get("badgeCount") or data.get("badge")
+    badges         = safe_str(fmt_num(badges_val))
+
     ob_version     = safe_str(data.get("obVersion") or basic.get("obVersion") or "OB54")
     
     rank_br        = safe_str(fmt_num(basic.get("rank") or data.get("rank") or "?"))
@@ -129,50 +127,57 @@ def format_player_info(data, uid):
     credit_reward  = safe_str(credit.get("rewardState") or credit.get("reward") or "?")
     diamond_cost   = safe_str(fmt_num(data.get("diamondCost") or "?"))
 
-    # Sky Blue Accent Theme Layout
-    return f"""<b>🩵 ─── [ FREE FIRE PLAYER INFO ] ─── 🩵</b>
+    return f"""━⟮ 🌟 <b>FREE FIRE PLAYER INFO</b> 🌟 ⟯━
 
-<blockquote expandable>💧 <b>BASIC INFO</b>
-🔹 <b>Name:</b> {nickname}
-🔹 <b>Uid:</b> {uid}
-🌐 <b>Region:</b> {region}
-🏆 <b>Level:</b> {level}
-⭐ <b>Exp:</b> {exp}
-🩵 <b>Likes:</b> {likes}
-🎖️ <b>Badges:</b> {badges}
-🔖 <b>Ob Version:</b> {ob_version}
-📅 <b>Account Created:</b> {create_time}
-🕐 <b>Last Login:</b> {last_login}
-💎 <b>Diamond Cost:</b> {diamond_cost}</blockquote>
+<blockquote>╭━⟮ 👤 <b>Basic Info</b> ⟯
+│ 😺 <b>Name:</b> {nickname}
+│ 🆔 <b>Uid:</b> {uid}
+│ 🌍 <b>Region:</b> {region}
+│ 🏆 <b>Level:</b> {level}
+│ ⭐ <b>Exp:</b> {exp}
+│ ❤️ <b>Likes:</b> {likes}
+│ 🎖️ <b>Badges:</b> {badges}
+│ 🔖 <b>Ob Version:</b> {ob_version}
+│ 📅 <b>Account Created:</b>
+│ {create_time}
+│ 🕐 <b>Last Login:</b>
+│ {last_login}
+│ 💎 <b>Diamond Cost:</b> {diamond_cost}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-<blockquote expandable>💧 <b>RANK INFO</b>
-🎯 <b>Br Rank:</b> {rank_br}
-🏆 <b>Br Highest Rank:</b> {rank_br_high}
-📊 <b>Br Points:</b> {br_points}
-⚔️ <b>Cs Rank:</b> {cs_rank}
-🏆 <b>Cs Highest Rank:</b> {cs_rank_high}
-📊 <b>Cs Points:</b> {cs_points}</blockquote>
+<blockquote>╭━⟮ 🏅 <b>Rank Info</b> ⟯
+│ 🎯 <b>Br Rank:</b> {rank_br}
+│ 🏆 <b>Br Highest Rank:</b> {rank_br_high}
+│ 🎯 <b>Br Points:</b> {br_points}
+│ ⚔️ <b>Cs Rank:</b> {cs_rank}
+│ 🏆 <b>Cs Highest Rank:</b> {cs_rank_high}
+│ ⚔️ <b>Cs Points:</b> {cs_points}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-<blockquote expandable>💧 <b>SOCIAL INFO</b>
-💬 <b>Bio:</b> {bio}
-🌐 <b>Language:</b> {language}
-🎮 <b>Preferred Mode:</b> {pref_mode}</blockquote>
+<blockquote>╭━⟮ 💬 <b>Social Info</b> ⟯
+│ 📝 <b>Bio:</b> {bio}
+│ 🌐 <b>Language:</b> {language}
+│ 🎮 <b>Preferred Mode:</b> {pref_mode}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-<blockquote expandable>💧 <b>GUILD INFO</b>
-🏰 <b>Name:</b> {guild_name}
-🆔 <b>Guild Id:</b> {guild_id}
-📶 <b>Level:</b> {guild_level}
-👥 <b>Members:</b> {guild_members}
-👑 <b>Captain:</b> {guild_captain} ({gc_uid})</blockquote>
+<blockquote>╭━⟮ 🏰 <b>Guild Info</b> ⟯
+│ 🏯 <b>Name:</b> {guild_name}
+│ 🆔 <b>Guild Id:</b> {guild_id}
+│ 📶 <b>Level:</b> {guild_level}
+│ 👥 <b>Members:</b> {guild_members}
+│ 👑 <b>Captain:</b> {guild_captain} ({gc_uid})
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-<blockquote expandable>💧 <b>PET INFO</b>
-🐾 <b>Name:</b> {pet_name}
-📶 <b>Level:</b> {pet_level}
-⭐ <b>Exp:</b> {pet_exp}</blockquote>
+<blockquote>╭━⟮ 🐾 <b>Pet Info</b> ⟯
+│ 🐶 <b>Name:</b> {pet_name}
+│ 📶 <b>Level:</b> {pet_level}
+│ ⭐ <b>Exp:</b> {pet_exp}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-<blockquote expandable>💧 <b>CREDIT SCORE</b>
-🛡️ <b>Score:</b> {credit_score}
-🎁 <b>Reward State:</b> {credit_reward}</blockquote>"""
+<blockquote>╭━⟮ 🛡️ <b>Credit Score</b> ⟯
+│ 📊 <b>Score:</b> {credit_score}
+│ 🎁 <b>Reward State:</b> {credit_reward}
+╰━━━━━━━━━━━━━━━✪</blockquote>"""
 
 # ===================== BOT HANDLERS =====================
 
@@ -213,24 +218,14 @@ async def process_uid(update: Update, uid: str):
         logger.error(f"Error: {e}")
         await wait_msg.edit_text(f"❌ <b>Error:</b> <code>{html.escape(str(e))}</code>", parse_mode="HTML")
 
-# ===================== FLASK HEALTH CHECK =====================
-
-@app.route('/')
-def home():
-    return '✅ Free Fire Info Bot is running!', 200
-
 def run_flask():
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-
-# ===================== MAIN =====================
 
 if __name__ == "__main__":
     if not BOT_TOKEN:
         logger.error("❌ BOT_TOKEN environment variable is missing on Render!")
         exit(1)
-
-    logger.info(f"🔑 Using API_KEY: {API_KEY}")
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
