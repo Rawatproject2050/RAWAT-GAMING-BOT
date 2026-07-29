@@ -299,21 +299,69 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_uid(update: Update, uid: str):
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
-        await update.message.reply_text("❌ <b>Invalid UID!</b>", parse_mode="HTML")
+        await update.message.reply_text(
+            "╭━━━⟮ ❌ <b>INVALID INPUT</b> ⟯━━━╮\n"
+            "│\n"
+            "│ ⚠️ <b>Invalid UID Format!</b>\n"
+            "│ Kripya sahi Free Fire Player UID dalein.\n"
+            "│\n"
+            "╰━━━━━━━━━━━━━━━━━━━━━╯", 
+            parse_mode="HTML"
+        )
         return
 
-    wait_msg = await update.message.reply_text("⏳ <b>Fetching player info...</b>", parse_mode="HTML")
-    try:
-        data = get_player_info(uid)
-        if not data:
-            await wait_msg.edit_text("❌ <b>Player not found or API Server Busy!</b>", parse_mode="HTML")
-            return
-        formatted = format_player_info(data, uid)
-        await wait_msg.edit_text(formatted, parse_mode="HTML")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        await wait_msg.edit_text(f"❌ <b>Error:</b> <code>{html.escape(str(e))}</code>", parse_mode="HTML")
+    # 🚀 Professional Animated Loading Message
+    loading_card = (
+        "╭━━━⟮ ⚡ <b>RAWAT FF SCANNER</b> ⟯━━━╮\n"
+        "│\n"
+        f"│ 🆔 <b>Target UID:</b> <code>{uid}</code>\n"
+        "│ 🌐 <b>Status:</b> <i>Connecting to Garena API...</i>\n"
+        "│ 🔄 <b>Progress:</b> [████████▒▒] 80%\n"
+        "│\n"
+        "│ ⏳ <i>Fetching player profile & stats...</i>\n"
+        "│\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━╯"
+    )
 
+    wait_msg = await update.message.reply_text(loading_card, parse_mode="HTML")
+    
+    # 🔄 Auto Retry Logic (3 Times Check Karega)
+    data = None
+    for attempt in range(3):
+        try:
+            data = get_player_info(uid)
+            if data:
+                break # Data milte hi loop stops
+        except Exception as e:
+            logger.error(f"Attempt {attempt + 1} failed: {e}")
+
+    # Agar Data Mil Gaya:
+    if data:
+        try:
+            formatted = format_player_info(data, uid)
+            await wait_msg.edit_text(formatted, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Formatting Error: {e}")
+            await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b> Try again later.", parse_mode="HTML")
+    
+    # Agar Server Busy Raha:
+    else:
+        smart_error_msg = (
+            "╭━━━⟮ ⚠️ <b>SERVER TRAFFIC NOTICE</b> ⟯━━━╮\n"
+            "│\n"
+            f"│ 🆔 <b>Target UID:</b> <code>{uid}</code>\n"
+            "│ 🌐 <b>Status:</b> Game Server Busy\n"
+            "│\n"
+            "│ 💬 <b>Garena Free Fire Server abhi heavy traffic</b>\n"
+            "│ <b>par hai. Aapki UID bilkul sahi hai!</b>\n"
+            "│\n"
+            "│ 🔄 <b>Kripya 10-15 seconds baad dubara try karein:</b>\n"
+            "│ 👉 <code>/info {uid}</code>\n"
+            "│\n"
+            "╰━━━━━━━━━━━━━━━━━━━━━╯\n"
+            "💡 <i>Tip: Aap UID ko dubara copy karke bhej sakte hain.</i>"
+        )
+        await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
 # Function to Set Telegram Bot Menu Commands (Popup '/' Menu)
 async def post_init(application: Application):
     bot_commands = [
