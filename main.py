@@ -127,7 +127,7 @@ def format_player_info(data, uid):
     credit_reward  = safe_str(credit.get("rewardState") or credit.get("reward") or "?")
     diamond_cost   = safe_str(fmt_num(data.get("diamondCost") or "?"))
 
-    return f"""━⟮ 🌟 <b>FREE FIRE PLAYER INFO</b> 🌟 ⟯━
+    return f"""━⟮ 🎮 <b>FREE FIRE PLAYER INFO</b>  ⟯━
 
 <blockquote>╭━⟮ 👤 <b>Basic Info</b> ⟯
 │ 😺 <b>Name:</b> {nickname}
@@ -308,7 +308,7 @@ async def process_uid(update: Update, uid: str):
 
     # Original Simple Message
     wait_msg = await update.message.reply_text(
-        "⏳ Fetching player info...", 
+        "⏳ Request processing...", 
         parse_mode="HTML"
     )
     
