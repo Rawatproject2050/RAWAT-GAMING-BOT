@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ===================== CONFIG =====================
 # Render Environment Variables se Token uthayega
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
-API_BASE = "https://client.ind.freefiremobile.com/"
+API_BASE = "https://gameskinbo.com/api/ff_id_checker?uid={uid}&token={token}&region=ind"
 # =================================================
 
 logging.basicConfig(level=logging.INFO)
