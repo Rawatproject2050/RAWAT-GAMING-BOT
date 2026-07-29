@@ -182,12 +182,19 @@ def format_player_info(data, uid):
 # ===================== BOT HANDLERS =====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 <b>Welcome to Free Fire Info Bot!</b>\n\n"
-        "Send a Free Fire UID directly OR use:\n"
-        "<code>/info 2722004155</code>",
-        parse_mode="HTML"
+    welcome_text = (
+        "<b>🩵 ─── [ RAWAT FF INFO BOT ] ─── 🩵</b>\n\n"
+        "<b>👋 Welcome to RAWAT FF INFO BOT!</b>\n"
+        "<i>Your Ultimate Free Fire Player Analytics Partner.</i>\n\n"
+        "<blockquote expandable>⚡ <b>HOW TO USE THE BOT</b>\n\n"
+        "1️⃣ <b>Direct Search:</b> Just send any Free Fire UID directly in this chat.\n"
+        "2️⃣ <b>Command Search:</b> Use the command format below:\n"
+        "   👉 <code>/info 2722004155</code>\n\n"
+        "✨ <b>Features:</b> Real-time Profile Info, Rank & Points, Guild Details, Pet Stats, Account Creation Date, Last Login & Credit Score.</blockquote>\n\n"
+        "📌 <i>Send a UID right now to fetch player stats!</i>"
     )
+    
+    await update.message.reply_text(welcome_text, parse_mode="HTML")
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
