@@ -183,10 +183,10 @@ def format_player_info(data, uid):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "<b>🩵 ─── [ RAWAT FF INFO BOT ] ─── 🩵</b>\n\n"
+        "<b>❤ ── [ RAWAT FF INFO BOT ] ── ❤</b>\n\n"
         "<b>👋 Welcome to RAWAT FF INFO BOT!</b>\n"
         "<i>Your Ultimate Free Fire Player Analytics Partner.</i>\n\n"
-        "<blockquote expandable>⚡ <b>HOW TO USE THE BOT</b>\n\n"
+        "<blockquote>⚡ <b>HOW TO USE THE BOT</b>\n\n"
         "1️⃣ <b>Direct Search:</b> Just send any Free Fire UID directly in this chat.\n"
         "2️⃣ <b>Command Search:</b> Use the command format below:\n"
         "   👉 <code>/info 2722004155</code>\n\n"
