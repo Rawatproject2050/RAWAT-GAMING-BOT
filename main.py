@@ -8,10 +8,9 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===================== CONFIG =====================
-# Render Environment Variables se Token uthayega
+# Render Environment Variables se Token aur Key uthayega
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
-# SiamBhau Exact Working Endpoint
-    url = f"https://siambhau69.eu.cc/freefireinfo/bhau?uid={uid}&region={region.upper()}&key=FFINFO-Free"
+API_KEY = os.getenv("API_KEY", "FFINFO-Free")  # Fallback to FFINFO-Free if not set in Render
 # =================================================
 
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 # Flask app for Render health check
 app = Flask(__name__)
 
-# Helper function to format numbers with commas (e.g., 14314 -> 14,314)
+# Helper function to format numbers with commas
 def fmt_num(val):
     if val is None or val == "?" or val == "":
         return "?"
@@ -29,19 +28,27 @@ def fmt_num(val):
     except (ValueError, TypeError):
         return str(val)
 
-# ===================== FREE FIRE API =====================
+# ===================== FREE FIRE API (SiamBhau Direct) =====================
 
 def get_player_info(uid):
-    regions = ["IND", "SG", "BR", "BD", "PK"]
+    regions = ["IND", "BD", "SG", "BR", "PK"]
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+
     for region in regions:
         try:
-            url = f"{API_BASE}/account?region={region}&uid={uid}"
-            resp = requests.get(url, timeout=10)
-            data = resp.json()
-            if "error" not in data and "basicInfo" in data:
-                data["region"] = region
-                return data
-        except Exception:
+            # SiamBhau API Match Link with Render API_KEY Variable
+            url = f"https://siambhau69.eu.cc/freefireinfo/bhau?uid={uid}&region={region}&key={API_KEY}"
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                # Verification if response is valid
+                if "basicInfo" in data or "nickname" in data or "Name" in data:
+                    data["region"] = region
+                    return data
+        except Exception as e:
+            logger.error(f"Error fetching for region {region}: {e}")
             continue
     return None
 
@@ -55,48 +62,48 @@ def format_player_info(data, uid):
     region = data.get("region", basic.get("region", "IND"))
 
     create_time = "Unknown"
-    if "accountCreateTime" in data:
+    if "accountCreateTime" in data or "accountCreateTime" in basic:
         try:
-            ts = int(data["accountCreateTime"])
+            ts = int(data.get("accountCreateTime") or basic.get("accountCreateTime"))
             create_time = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
         except Exception:
             create_time = str(data.get("accountCreateTime", "Unknown"))
 
     last_login = "Unknown"
-    if "lastLoginTime" in data:
+    if "lastLoginTime" in data or "lastLoginTime" in basic:
         try:
-            ts = int(data["lastLoginTime"])
+            ts = int(data.get("lastLoginTime") or basic.get("lastLoginTime"))
             last_login = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
         except Exception:
             last_login = str(data.get("lastLoginTime", "Unknown"))
 
-    nickname       = basic.get("nickname", "Unknown")
-    level          = basic.get("level", "?")
-    likes          = fmt_num(basic.get("liked", basic.get("likeCount", "?")))
-    exp            = fmt_num(basic.get("exp", basic.get("experience", "?")))
-    badges         = fmt_num(data.get("badgeCount", data.get("badges", "?")))
-    ob_version     = data.get("obVersion", "OB54")
-    rank_br        = fmt_num(basic.get("rank", "?"))
-    rank_br_high   = fmt_num(data.get("highestRank", basic.get("highestRank", rank_br)))
-    br_points      = fmt_num(basic.get("rankPoint", data.get("brPoints", "?")))
-    cs_rank        = fmt_num(data.get("csRank", "?"))
-    cs_rank_high   = fmt_num(data.get("csHighestRank", "?"))
-    cs_points      = fmt_num(data.get("csPoints", "?"))
-    bio            = data.get("signature", social.get("signature", "No Bio"))
-    language       = social.get("language", data.get("language", "Language_EN"))
-    pref_mode      = social.get("preferredMode", data.get("preferredMode", "ModePrefer_BR"))
-    guild_name     = clan.get("clanName", "None")
-    guild_id       = clan.get("clanId", "?")
-    guild_level    = clan.get("clanLevel", "?")
+    nickname       = basic.get("nickname") or data.get("nickname") or data.get("Name") or "Unknown"
+    level          = basic.get("level") or data.get("level") or "?"
+    likes          = fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?")
+    exp            = fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?")
+    badges         = fmt_num(data.get("badgeCount") or data.get("badges") or "?")
+    ob_version     = data.get("obVersion") or "OB54"
+    rank_br        = fmt_num(basic.get("rank") or data.get("rank") or "?")
+    rank_br_high   = fmt_num(data.get("highestRank") or basic.get("highestRank") or rank_br)
+    br_points      = fmt_num(basic.get("rankPoint") or data.get("brPoints") or "?")
+    cs_rank        = fmt_num(data.get("csRank") or "?")
+    cs_rank_high   = fmt_num(data.get("csHighestRank") or "?")
+    cs_points      = fmt_num(data.get("csPoints") or "?")
+    bio            = data.get("signature") or social.get("signature") or "No Bio"
+    language       = social.get("language") or data.get("language") or "Language_EN"
+    pref_mode      = social.get("preferredMode") or data.get("preferredMode") or "ModePrefer_BR"
+    guild_name     = clan.get("clanName") or "None"
+    guild_id       = clan.get("clanId") or "?"
+    guild_level    = clan.get("clanLevel") or "?"
     guild_members  = f"{clan.get('memberNum', '?')}/{clan.get('capacity', '?')}"
-    guild_captain  = captain.get("nickname", "Unknown")
-    gc_uid         = captain.get("accountId", "?")
-    pet_name       = pet.get("name", "None")
-    pet_level      = pet.get("level", "?")
-    pet_exp        = fmt_num(pet.get("exp", pet.get("experience", "?")))
-    credit_score   = fmt_num(credit.get("score", "?"))
-    credit_reward  = credit.get("rewardState", credit.get("reward", "?"))
-    diamond_cost   = fmt_num(data.get("diamondCost", "?"))
+    guild_captain  = captain.get("nickname") or "Unknown"
+    gc_uid         = captain.get("accountId") or "?"
+    pet_name       = pet.get("name") or "None"
+    pet_level      = pet.get("level") or "?"
+    pet_exp        = fmt_num(pet.get("exp") or pet.get("experience") or "?")
+    credit_score   = fmt_num(credit.get("score") or "?")
+    credit_reward  = credit.get("rewardState") or credit.get("reward") or "?"
+    diamond_cost   = fmt_num(data.get("diamondCost") or "?")
 
     return f"""╭━━━━━━━━━━━━━━━━━━━━✪
 │  🎮 Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ
@@ -182,7 +189,7 @@ async def process_uid(update: Update, uid: str):
     try:
         data = get_player_info(uid)
         if not data:
-            await wait_msg.edit_text("❌ *Player not found!*", parse_mode="Markdown")
+            await wait_msg.edit_text("❌ *Player not found or API Server Busy!*", parse_mode="Markdown")
             return
         formatted = format_player_info(data, uid)
         await wait_msg.edit_text(formatted, parse_mode="Markdown")
