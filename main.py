@@ -298,46 +298,47 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await process_uid(update, uid)
 
 async def process_uid(update: Update, uid: str):
+    # Valid UID Check
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
-        await update.message.reply_text("❌ <b>Invalid UID format!</b>\nKripya sahi Free Fire UID dalein.", parse_mode="HTML")
+        await update.message.reply_text(
+            "❌ <b>Player not found or API Server Busy!</b>", 
+            parse_mode="HTML"
+        )
         return
 
-    wait_msg = await update.message.reply_text("⏳ <b>Fetching player info from Garena Servers...</b>", parse_mode="HTML")
+    # Original Simple Message
+    wait_msg = await update.message.reply_text(
+        "⏳ Fetching player info...", 
+        parse_mode="HTML"
+    )
     
-    # 🔄 Auto Retry Logic (3 Times Check Karega)
+    # API Request Processing
     data = None
     for attempt in range(3):
         try:
             data = get_player_info(uid)
             if data:
-                break # Response mil gaya to loop se bahar
+                break
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} failed: {e}")
 
-    # Agar Success Data Mil Gaya:
+    # Success Case
     if data:
         try:
             formatted = format_player_info(data, uid)
             await wait_msg.edit_text(formatted, parse_mode="HTML")
         except Exception as e:
-            
-    # Agar 3 Baar Try karne ke baad bhi API Server Busy raha:
+            logger.error(f"Formatting Error: {e}")
+            await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b> Try again later.", parse_mode="HTML")
+    
+    # Server Busy Case
     else:
         smart_error_msg = (
-            "╭━━━⟮ ⚠️ <b>SERVER TRAFFIC NOTICE</b> ⟯━━━╮\n"
-            "│\n"
-            f"│ 🆔 <b>Target UID:</b> <code>{uid}</code>\n"
-            "│ 🌐 <b>Status:</b> Game Server Busy\n"
-            "│\n"
-            "│ 💬 <b>Garena Free Fire Server abhi heavy traffic</b>\n"
-            "│ <b>par hai. Aapki UID bilkul sahi hai!</b>\n"
-            "│\n"
-            "│ 🔄 <b>Kripya 10-15 seconds baad dubara</b>\n"
-            "│ <b>try karein:</b>\n"
-            "│ 👉 <code>/info {uid}</code>\n"
-            "│\n"
-            "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n"
-            "💡 <i>Tip: Aap UID ko dubara copy karke bhej sakte hain.</i>"
+            "⚠️ <b>Server Traffic Notice</b>\n\n"
+            f"🆔 <b>UID:</b> <code>{uid}</code>\n"
+            "🌐 <b>Status:</b> Game Server Busy\n\n"
+            "Garena Free Fire server heavy traffic par hai. Aapki UID bilkul sahi hai.\n\n"
+            f"🔄 <b>10 seconds baad try karein:</b> <code>/info {uid}</code>"
         )
         await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
         
