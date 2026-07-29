@@ -47,25 +47,53 @@ def generate_token(uid: str) -> str:
     return base64.b64encode(raw.encode()).decode()
 
 # ===================== API CALL FUNCTION =====================
-def get_player_info(uid: str, region: str = "ind"):
-    token = generate_token(str(uid))
-    url = f"https://gameskinbo.com/api/ff_id_checker?uid={uid}&token={token}&region={region}"
-    headers = {
-        'authority': 'gameskinbo.com',
-        'accept': '*/*',
-        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-        'x-api-client': 'gameskinbo-web',
-        'referer': 'https://gameskinbo.com/free_fire_id_checker',
-    }
-    try:
-        res = requests.get(url, headers=headers, timeout=10)
-        data = res.json()
-        if "name" in data:
-            return data
-    except Exception as e:
-        print(f"API Error: {e}")
-    return None
+import requests
 
+def get_player_info(uid: str, region: str = "IND"):
+    # Main Working FF Public APIs
+    api_urls = [
+        f"https://free-ff-api-src-5plp.onrender.com/api/v1/account?region={region}&uid={uid}",
+        f"https://freefireinfo-zy9l.onrender.com/api/v1/search-players?keyword={uid}&server={region}"
+    ]
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+
+    for url in api_urls:
+        try:
+            res = requests.get(url, headers=headers, timeout=8)
+            if res.status_code == 200:
+                data = res.json()
+                
+                # Format 1 (free-ff-api)
+                if "basicInfo" in data:
+                    info = data["basicInfo"]
+                    return {
+                        "name": info.get("nickname", "Unknown"),
+                        "level": info.get("level", "N/A"),
+                        "likes": info.get("liked", 0),
+                        "br_rank": info.get("rankingPoints", "N/A"),
+                        "region": info.get("region", region),
+                        "guild_name": data.get("clanBasicInfo", {}).get("clanName", "None")
+                    }
+                
+                # Format 2 (freefireinfo-zy9l)
+                elif "infos" in data and len(data["infos"]) > 0:
+                    info = data["infos"][0]
+                    return {
+                        "name": info.get("nickname", "Unknown"),
+                        "level": info.get("level", "N/A"),
+                        "likes": info.get("liked", 0),
+                        "br_rank": info.get("rankingPoints", "N/A"),
+                        "region": info.get("region", region),
+                        "guild_name": "N/A"
+                    }
+        except Exception as e:
+            print(f"API Attempt Failed: {e}")
+            continue
+
+    return None
 # ===================== BOT COMMAND HANDLERS =====================
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
