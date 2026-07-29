@@ -299,42 +299,10 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_uid(update: Update, uid: str):
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
-        await update.message.reply_text(
-            "⚠️ <b>Invalid UID!</b>\nKripya sahi Free Fire UID dalein.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("❌ <b>Invalid UID format!</b>\nKripya sahi Free Fire UID dalein.", parse_mode="HTML")
         return
 
-    # Direct Single Status Message
-    wait_msg = await update.message.reply_text(
-        f"⚡ <b>Searching UID:</b> <code>{uid}</code>\n"
-        "⏳ <i>Connecting to Garena Servers...</i>", 
-        parse_mode="HTML"
-    )
-    
-    data = None
-    for attempt in range(3):
-        try:
-            data = get_player_info(uid)
-            if data:
-                break
-        except Exception as e:
-            logger.error(f"Attempt {attempt + 1} failed: {e}")
-
-    if data:
-        try:
-            formatted = format_player_info(data, uid)
-            await wait_msg.edit_text(formatted, parse_mode="HTML")
-        except Exception as e:
-            await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b>", parse_mode="HTML")
-    else:
-        smart_error_msg = (
-            "⚠️ <b>Server Traffic Notice</b>\n\n"
-            f"🆔 <b>UID:</b> <code>{uid}</code>\n"
-            "🌐 <b>Status:</b> Game Server Busy\n\n"
-            f"🔄 <b>10s baad retry karein:</b> <code>/info {uid}</code>"
-        )
-        await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
+    wait_msg = await update.message.reply_text("⏳ <b>Fetching player info from Garena Servers...</b>", parse_mode="HTML")
     
     # 🔄 Auto Retry Logic (3 Times Check Karega)
     data = None
@@ -342,20 +310,18 @@ async def process_uid(update: Update, uid: str):
         try:
             data = get_player_info(uid)
             if data:
-                break # Data milte hi loop stops
+                break # Response mil gaya to loop se bahar
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} failed: {e}")
 
-    # Agar Data Mil Gaya:
+    # Agar Success Data Mil Gaya:
     if data:
         try:
             formatted = format_player_info(data, uid)
             await wait_msg.edit_text(formatted, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Formatting Error: {e}")
-            await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b> Try again later.", parse_mode="HTML")
-    
-    # Agar Server Busy Raha:
+            
+    # Agar 3 Baar Try karne ke baad bhi API Server Busy raha:
     else:
         smart_error_msg = (
             "╭━━━⟮ ⚠️ <b>SERVER TRAFFIC NOTICE</b> ⟯━━━╮\n"
@@ -366,13 +332,15 @@ async def process_uid(update: Update, uid: str):
             "│ 💬 <b>Garena Free Fire Server abhi heavy traffic</b>\n"
             "│ <b>par hai. Aapki UID bilkul sahi hai!</b>\n"
             "│\n"
-            "│ 🔄 <b>Kripya 10-15 seconds baad dubara try karein:</b>\n"
+            "│ 🔄 <b>Kripya 10-15 seconds baad dubara</b>\n"
+            "│ <b>try karein:</b>\n"
             "│ 👉 <code>/info {uid}</code>\n"
             "│\n"
-            "╰━━━━━━━━━━━━━━━━━━━━━╯\n"
+            "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n"
             "💡 <i>Tip: Aap UID ko dubara copy karke bhej sakte hain.</i>"
         )
         await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
+        
 # Function to Set Telegram Bot Menu Commands (Popup '/' Menu)
 async def post_init(application: Application):
     bot_commands = [
