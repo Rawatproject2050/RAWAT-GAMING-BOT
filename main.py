@@ -2,6 +2,7 @@ import os
 import threading
 import requests
 import logging
+import html
 from datetime import datetime
 from flask import Flask
 from telegram import Update
@@ -10,7 +11,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ===================== CONFIG =====================
 # Render Environment Variables se Token aur Key uthayega
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
-API_KEY = os.getenv("API_KEY", "FFINFO-Free")  # Fallback to FFINFO-Free if not set in Render
+API_KEY = os.getenv("API_KEY", "FFINFO-Free")
 # =================================================
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Flask app for Render health check
 app = Flask(__name__)
 
-# Helper function to format numbers with commas
+# Helper function to format numbers
 def fmt_num(val):
     if val is None or val == "?" or val == "":
         return "?"
@@ -27,6 +28,12 @@ def fmt_num(val):
         return f"{int(val):,}"
     except (ValueError, TypeError):
         return str(val)
+
+# Helper function to escape HTML special characters to prevent Telegram Parse Error
+def safe_str(text):
+    if text is None:
+        return "?"
+    return html.escape(str(text))
 
 # ===================== FREE FIRE API (SiamBhau Direct) =====================
 
@@ -38,12 +45,10 @@ def get_player_info(uid):
 
     for region in regions:
         try:
-            # SiamBhau API Match Link with Render API_KEY Variable
             url = f"https://siambhau69.eu.cc/freefireinfo/bhau?uid={uid}&region={region}&key={API_KEY}"
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
-                # Verification if response is valid
                 if "basicInfo" in data or "nickname" in data or "Name" in data:
                     data["region"] = region
                     return data
@@ -77,39 +82,39 @@ def format_player_info(data, uid):
         except Exception:
             last_login = str(data.get("lastLoginTime", "Unknown"))
 
-    nickname       = basic.get("nickname") or data.get("nickname") or data.get("Name") or "Unknown"
-    level          = basic.get("level") or data.get("level") or "?"
-    likes          = fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?")
-    exp            = fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?")
-    badges         = fmt_num(data.get("badgeCount") or data.get("badges") or "?")
-    ob_version     = data.get("obVersion") or "OB54"
-    rank_br        = fmt_num(basic.get("rank") or data.get("rank") or "?")
-    rank_br_high   = fmt_num(data.get("highestRank") or basic.get("highestRank") or rank_br)
-    br_points      = fmt_num(basic.get("rankPoint") or data.get("brPoints") or "?")
-    cs_rank        = fmt_num(data.get("csRank") or "?")
-    cs_rank_high   = fmt_num(data.get("csHighestRank") or "?")
-    cs_points      = fmt_num(data.get("csPoints") or "?")
-    bio            = data.get("signature") or social.get("signature") or "No Bio"
-    language       = social.get("language") or data.get("language") or "Language_EN"
-    pref_mode      = social.get("preferredMode") or data.get("preferredMode") or "ModePrefer_BR"
-    guild_name     = clan.get("clanName") or "None"
-    guild_id       = clan.get("clanId") or "?"
-    guild_level    = clan.get("clanLevel") or "?"
-    guild_members  = f"{clan.get('memberNum', '?')}/{clan.get('capacity', '?')}"
-    guild_captain  = captain.get("nickname") or "Unknown"
-    gc_uid         = captain.get("accountId") or "?"
-    pet_name       = pet.get("name") or "None"
-    pet_level      = pet.get("level") or "?"
-    pet_exp        = fmt_num(pet.get("exp") or pet.get("experience") or "?")
-    credit_score   = fmt_num(credit.get("score") or "?")
-    credit_reward  = credit.get("rewardState") or credit.get("reward") or "?"
-    diamond_cost   = fmt_num(data.get("diamondCost") or "?")
+    nickname       = safe_str(basic.get("nickname") or data.get("nickname") or data.get("Name") or "Unknown")
+    level          = safe_str(basic.get("level") or data.get("level") or "?")
+    likes          = safe_str(fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?"))
+    exp            = safe_str(fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?"))
+    badges         = safe_str(fmt_num(data.get("badgeCount") or data.get("badges") or "?"))
+    ob_version     = safe_str(data.get("obVersion") or "OB54")
+    rank_br        = safe_str(fmt_num(basic.get("rank") or data.get("rank") or "?"))
+    rank_br_high   = safe_str(fmt_num(data.get("highestRank") or basic.get("highestRank") or rank_br))
+    br_points      = safe_str(fmt_num(basic.get("rankPoint") or data.get("brPoints") or "?"))
+    cs_rank        = safe_str(fmt_num(data.get("csRank") or "?"))
+    cs_rank_high   = safe_str(fmt_num(data.get("csHighestRank") or "?"))
+    cs_points      = safe_str(fmt_num(data.get("csPoints") or "?"))
+    bio            = safe_str(data.get("signature") or social.get("signature") or "No Bio")
+    language       = safe_str(social.get("language") or data.get("language") or "Language_EN")
+    pref_mode      = safe_str(social.get("preferredMode") or data.get("preferredMode") or "ModePrefer_BR")
+    guild_name     = safe_str(clan.get("clanName") or "None")
+    guild_id       = safe_str(clan.get("clanId") or "?")
+    guild_level    = safe_str(clan.get("clanLevel") or "?")
+    guild_members  = safe_str(f"{clan.get('memberNum', '?')}/{clan.get('capacity', '?')}")
+    guild_captain  = safe_str(captain.get("nickname") or "Unknown")
+    gc_uid         = safe_str(captain.get("accountId") or "?")
+    pet_name       = safe_str(pet.get("name") or "None")
+    pet_level      = safe_str(pet.get("level") or "?")
+    pet_exp        = safe_str(fmt_num(pet.get("exp") or pet.get("experience") or "?"))
+    credit_score   = safe_str(fmt_num(credit.get("score") or "?"))
+    credit_reward  = safe_str(credit.get("rewardState") or credit.get("reward") or "?")
+    diamond_cost   = safe_str(fmt_num(data.get("diamondCost") or "?"))
 
     return f"""╭━━━━━━━━━━━━━━━━━━━━✪
-│  🎮 Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ
+│  🎮 <b>Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ</b>
 ╰━━━━━━━━━━━━━━━━━━━━✪
 
-╭━⟮ 👤 Bᴀꜱɪᴄ Iɴꜰᴏ ⟯
+╭━⟮ 👤 <b>Bᴀꜱɪᴄ Iɴꜰᴏ</b> ⟯
 │ 😺 Nᴀᴍᴇ: {nickname}
 │ 🆔 Uɪᴅ: {uid}
 │ 🌍 Rᴇɢɪᴏɴ: {region}
@@ -123,7 +128,7 @@ def format_player_info(data, uid):
 │ 💎 Dɪᴀᴍᴏɴᴅ Cᴏꜱᴛ: {diamond_cost}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🏅 Rᴀɴᴋ Iɴꜰᴏ ⟯
+╭━⟮ 🏅 <b>Rᴀɴᴋ Iɴꜰᴏ</b> ⟯
 │ 🎯 Bʀ Rᴀɴᴋ: {rank_br}
 │ 🏆 Bʀ Hɪɢʜᴇꜱᴛ Rᴀɴᴋ: {rank_br_high}
 │ 🎯 Bʀ Pᴏɪɴᴛꜱ: {br_points}
@@ -132,13 +137,13 @@ def format_player_info(data, uid):
 │ ⚔️ Cꜱ Pᴏɪɴᴛꜱ: {cs_points}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 💬 Sᴏᴄɪᴀʟ Iɴꜰᴏ ⟯
+╭━⟮ 💬 <b>Sᴏᴄɪᴀʟ Iɴꜰᴏ</b> ⟯
 │ 📝 Bɪᴏ: {bio}
 │ 🌐 Lᴀɴɢᴜᴀɢᴇ: {language}
 │ 🎮 Pʀᴇꜰᴇʀʀᴇᴅ Mᴏᴅᴇ: {pref_mode}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🏰 Gᴜɪʟᴅ Iɴꜰᴏ ⟯
+╭━⟮ 🏰 <b>Gᴜɪʟᴅ Iɴꜰᴏ</b> ⟯
 │ 🏯 Nᴀᴍᴇ: {guild_name}
 │ 🆔 Gᴜɪʟᴅ Iᴅ: {guild_id}
 │ 📶 Lᴇᴠᴇʟ: {guild_level}
@@ -146,13 +151,13 @@ def format_player_info(data, uid):
 │ 👑 Cᴀᴘᴛᴀɪɴ: {guild_captain} ({gc_uid})
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🐾 Pᴇᴛ Iɴꜰᴏ ⟯
+╭━⟮ 🐾 <b>Pᴇᴛ Iɴꜰᴏ</b> ⟯
 │ 🐶 Nᴀᴍᴇ: {pet_name}
 │ 📶 Lᴇᴠᴇʟ: {pet_level}
 │ ⭐ Exᴘ: {pet_exp}
 ╰━━━━━━━━━━━━━━━✪
 
-╭━⟮ 🛡️ Cʀᴇᴅɪᴛ Sᴄᴏʀᴇ ⟯
+╭━⟮ 🛡️ <b>Cʀᴇᴅɪᴛ Sᴄᴏʀᴇ</b> ⟯
 │ 📊 Sᴄᴏʀᴇ: {credit_score}
 │ 🎁 Rᴇᴡᴀʀᴅ Sᴛᴀᴛᴇ: {credit_reward}
 ╰━━━━━━━━━━━━━━━✪"""
@@ -161,16 +166,16 @@ def format_player_info(data, uid):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 *Welcome to Free Fire Info Bot!*\n\n"
+        "👋 <b>Welcome to Free Fire Info Bot!</b>\n\n"
         "You can send a Free Fire UID directly OR use the command:\n"
-        "`/info 2722004155`\n\n"
-        "Example: `2722004155`",
-        parse_mode="Markdown"
+        "<code>/info 2722004155</code>\n\n"
+        "Example: <code>2722004155</code>",
+        parse_mode="HTML"
     )
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("❌ *Please provide a UID!*\nExample: `/info 2722004155`", parse_mode="Markdown")
+        await update.message.reply_text("❌ <b>Please provide a UID!</b>\nExample: <code>/info 2722004155</code>", parse_mode="HTML")
         return
     
     uid = context.args[0].strip()
@@ -182,20 +187,22 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_uid(update: Update, uid: str):
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
-        await update.message.reply_text("❌ *Invalid UID!*", parse_mode="Markdown")
+        await update.message.reply_text("❌ <b>Invalid UID!</b>", parse_mode="HTML")
         return
 
-    wait_msg = await update.message.reply_text("⏳ *Fetching player info...*", parse_mode="Markdown")
+    wait_msg = await update.message.reply_text("⏳ <b>Fetching player info...</b>", parse_mode="HTML")
     try:
         data = get_player_info(uid)
         if not data:
-            await wait_msg.edit_text("❌ *Player not found or API Server Busy!*", parse_mode="Markdown")
+            await wait_msg.edit_text("❌ <b>Player not found or API Server Busy!</b>", parse_mode="HTML")
             return
         formatted = format_player_info(data, uid)
-        await wait_msg.edit_text(formatted, parse_mode="Markdown")
+        
+        # HTML Parse Mode is bulletproof against fancy player names & symbols
+        await wait_msg.edit_text(formatted, parse_mode="HTML")
     except Exception as e:
         logger.error(f"Error: {e}")
-        await wait_msg.edit_text(f"❌ *Error:* `{str(e)}`", parse_mode="Markdown")
+        await wait_msg.edit_text(f"❌ <b>Error:</b> <code>{html.escape(str(e))}</code>", parse_mode="HTML")
 
 # ===================== FLASK HEALTH CHECK =====================
 
