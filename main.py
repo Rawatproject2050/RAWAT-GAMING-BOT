@@ -300,30 +300,41 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_uid(update: Update, uid: str):
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
         await update.message.reply_text(
-            "╭━━━⟮ ❌ <b>INVALID INPUT</b> ⟯━━━╮\n"
-            "│\n"
-            "│ ⚠️ <b>Invalid UID Format!</b>\n"
-            "│ Kripya sahi Free Fire Player UID dalein.\n"
-            "│\n"
-            "╰━━━━━━━━━━━━━━━━━━━━━╯", 
+            "⚠️ <b>Invalid UID!</b>\nKripya sahi Free Fire UID dalein.",
             parse_mode="HTML"
         )
         return
 
-    # 🚀 Professional Animated Loading Message
-    loading_card = (
-        "╭━━━⟮ ⚡ <b>RAWAT FF SCANNER</b> ⟯━━━╮\n"
-        "│\n"
-        f"│ 🆔 <b>Target UID:</b> <code>{uid}</code>\n"
-        "│ 🌐 <b>Status:</b> <i>Connecting to Garena API...</i>\n"
-        "│ 🔄 <b>Progress:</b> [████████▒▒] 80%\n"
-        "│\n"
-        "│ ⏳ <i>Fetching player profile & stats...</i>\n"
-        "│\n"
-        "╰━━━━━━━━━━━━━━━━━━━━━╯"
+    # Direct Single Status Message
+    wait_msg = await update.message.reply_text(
+        f"⚡ <b>Searching UID:</b> <code>{uid}</code>\n"
+        "⏳ <i>Connecting to Garena Servers...</i>", 
+        parse_mode="HTML"
     )
+    
+    data = None
+    for attempt in range(3):
+        try:
+            data = get_player_info(uid)
+            if data:
+                break
+        except Exception as e:
+            logger.error(f"Attempt {attempt + 1} failed: {e}")
 
-    wait_msg = await update.message.reply_text(loading_card, parse_mode="HTML")
+    if data:
+        try:
+            formatted = format_player_info(data, uid)
+            await wait_msg.edit_text(formatted, parse_mode="HTML")
+        except Exception as e:
+            await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b>", parse_mode="HTML")
+    else:
+        smart_error_msg = (
+            "⚠️ <b>Server Traffic Notice</b>\n\n"
+            f"🆔 <b>UID:</b> <code>{uid}</code>\n"
+            "🌐 <b>Status:</b> Game Server Busy\n\n"
+            f"🔄 <b>10s baad retry karein:</b> <code>/info {uid}</code>"
+        )
+        await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
     
     # 🔄 Auto Retry Logic (3 Times Check Karega)
     data = None
