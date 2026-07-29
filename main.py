@@ -8,34 +8,43 @@ from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ===================== CONFIG =====================
-# Render Environment Variables se Token aur Key uthayega
+# ===================== RENDER ENV CONFIG =====================
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 API_KEY = os.getenv("API_KEY", "FFINFO-Free")
-# =================================================
+# =============================================================
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Flask app for Render health check
 app = Flask(__name__)
 
-# Helper function to format numbers
 def fmt_num(val):
-    if val is None or val == "?" or val == "":
+    if val is None or val == "?" or val == "" or val == "0":
         return "?"
     try:
         return f"{int(val):,}"
     except (ValueError, TypeError):
         return str(val)
 
-# Helper function to escape HTML special characters to prevent Telegram Parse Error
 def safe_str(text):
-    if text is None:
+    if text is None or text == "":
         return "?"
     return html.escape(str(text))
 
-# ===================== FREE FIRE API (SiamBhau Direct) =====================
+# Format timestamp to readable date/time
+def parse_time(ts, fmt="%Y-%m-%d"):
+    if not ts or str(ts) in ["0", "?", "None"]:
+        return "Unknown"
+    try:
+        ts_int = int(ts)
+        # If timestamp is in milliseconds, convert to seconds
+        if ts_int > 10000000000:
+            ts_int = ts_int // 1000
+        return datetime.fromtimestamp(ts_int).strftime(fmt)
+    except Exception:
+        return str(ts)
+
+# ===================== FREE FIRE API =====================
 
 def get_player_info(uid):
     regions = ["IND", "BD", "SG", "BR", "PK"]
@@ -58,118 +67,125 @@ def get_player_info(uid):
     return None
 
 def format_player_info(data, uid):
-    basic = data.get("basicInfo", {})
-    social = data.get("socialInfo", {})
-    clan = data.get("clanBasicInfo", {})
-    captain = data.get("captainBasicInfo", {})
-    pet = data.get("petInfo", {})
-    credit = data.get("creditScore", {})
+    basic = data.get("basicInfo") or data.get("basic") or {}
+    social = data.get("socialInfo") or data.get("social") or {}
+    clan = data.get("clanBasicInfo") or data.get("clan") or {}
+    captain = data.get("captainBasicInfo") or data.get("captain") or {}
+    pet = data.get("petInfo") or data.get("pet") or {}
+    credit = data.get("creditScore") or data.get("credit") or {}
     region = data.get("region", basic.get("region", "IND"))
 
-    create_time = "Unknown"
-    if "accountCreateTime" in data or "accountCreateTime" in basic:
-        try:
-            ts = int(data.get("accountCreateTime") or basic.get("accountCreateTime"))
-            create_time = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-        except Exception:
-            create_time = str(data.get("accountCreateTime", "Unknown"))
+    # Extracting Create Time & Last Login from multiple possible API JSON paths
+    create_ts = (
+        data.get("accountCreateTime") or basic.get("accountCreateTime") or
+        data.get("createTime") or basic.get("createTime") or
+        data.get("openAcountTime") or basic.get("openAcountTime")
+    )
+    create_time = parse_time(create_ts, "%Y-%m-%d")
 
-    last_login = "Unknown"
-    if "lastLoginTime" in data or "lastLoginTime" in basic:
-        try:
-            ts = int(data.get("lastLoginTime") or basic.get("lastLoginTime"))
-            last_login = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            last_login = str(data.get("lastLoginTime", "Unknown"))
+    last_login_ts = (
+        data.get("lastLoginTime") or basic.get("lastLoginTime") or
+        data.get("lastLogin") or basic.get("lastLogin")
+    )
+    last_login = parse_time(last_login_ts, "%Y-%m-%d %H:%M")
 
     nickname       = safe_str(basic.get("nickname") or data.get("nickname") or data.get("Name") or "Unknown")
     level          = safe_str(basic.get("level") or data.get("level") or "?")
     likes          = safe_str(fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?"))
     exp            = safe_str(fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?"))
-    badges         = safe_str(fmt_num(data.get("badgeCount") or data.get("badges") or "?"))
-    ob_version     = safe_str(data.get("obVersion") or "OB54")
+    
+    # Badges extraction
+    badges_val     = data.get("badgeCount") or data.get("badges") or basic.get("badgeCount") or data.get("badge")
+    badges         = safe_str(fmt_num(badges_val))
+
+    ob_version     = safe_str(data.get("obVersion") or basic.get("obVersion") or "OB54")
+    
     rank_br        = safe_str(fmt_num(basic.get("rank") or data.get("rank") or "?"))
     rank_br_high   = safe_str(fmt_num(data.get("highestRank") or basic.get("highestRank") or rank_br))
     br_points      = safe_str(fmt_num(basic.get("rankPoint") or data.get("brPoints") or "?"))
-    cs_rank        = safe_str(fmt_num(data.get("csRank") or "?"))
-    cs_rank_high   = safe_str(fmt_num(data.get("csHighestRank") or "?"))
-    cs_points      = safe_str(fmt_num(data.get("csPoints") or "?"))
+    
+    cs_rank        = safe_str(fmt_num(data.get("csRank") or basic.get("csRank") or "?"))
+    cs_rank_high   = safe_str(fmt_num(data.get("csHighestRank") or basic.get("csHighestRank") or "?"))
+    cs_points      = safe_str(fmt_num(data.get("csPoints") or basic.get("csPoints") or "?"))
+    
     bio            = safe_str(data.get("signature") or social.get("signature") or "No Bio")
     language       = safe_str(social.get("language") or data.get("language") or "Language_EN")
     pref_mode      = safe_str(social.get("preferredMode") or data.get("preferredMode") or "ModePrefer_BR")
+    
     guild_name     = safe_str(clan.get("clanName") or "None")
     guild_id       = safe_str(clan.get("clanId") or "?")
     guild_level    = safe_str(clan.get("clanLevel") or "?")
     guild_members  = safe_str(f"{clan.get('memberNum', '?')}/{clan.get('capacity', '?')}")
     guild_captain  = safe_str(captain.get("nickname") or "Unknown")
     gc_uid         = safe_str(captain.get("accountId") or "?")
+    
     pet_name       = safe_str(pet.get("name") or "None")
     pet_level      = safe_str(pet.get("level") or "?")
     pet_exp        = safe_str(fmt_num(pet.get("exp") or pet.get("experience") or "?"))
+    
     credit_score   = safe_str(fmt_num(credit.get("score") or "?"))
     credit_reward  = safe_str(credit.get("rewardState") or credit.get("reward") or "?")
     diamond_cost   = safe_str(fmt_num(data.get("diamondCost") or "?"))
 
-    return f"""╭━━━━━━━━━━━━━━━━━━━━✪
-│  🎮 <b>Fʀᴇᴇ Fɪʀᴇ Pʟᴀʏᴇʀ Iɴꜰᴏ</b>
-╰━━━━━━━━━━━━━━━━━━━━✪
+    return f"""━⟮ 🌟 <b>FREE FIRE PLAYER INFO</b> 🌟 ⟯━
 
-╭━⟮ 👤 <b>Bᴀꜱɪᴄ Iɴꜰᴏ</b> ⟯
-│ 😺 Nᴀᴍᴇ: {nickname}
-│ 🆔 Uɪᴅ: {uid}
-│ 🌍 Rᴇɢɪᴏɴ: {region}
-│ 🏆 Lᴇᴠᴇʟ: {level}
-│ ⭐ Exᴘ: {exp}
-│ ❤️ Lɪᴋᴇꜱ: {likes}
-│ 🎖️ Bᴀᴅɢᴇꜱ: {badges}
-│ 🔖 Oʙ Vᴇʀꜱɪᴏɴ: {ob_version}
-│ 📅 Aᴄᴄᴏᴜɴᴛ Cʀᴇᴀᴛᴇᴅ: {create_time}
-│ 🕐 Lᴀꜱᴛ Lᴏɢɪɴ: {last_login}
-│ 💎 Dɪᴀᴍᴏɴᴅ Cᴏꜱᴛ: {diamond_cost}
-╰━━━━━━━━━━━━━━━✪
+<blockquote>╭━⟮ 👤 <b>Basic Info</b> ⟯
+│ 😺 <b>Name:</b> {nickname}
+│ 🆔 <b>Uid:</b> {uid}
+│ 🌍 <b>Region:</b> {region}
+│ 🏆 <b>Level:</b> {level}
+│ ⭐ <b>Exp:</b> {exp}
+│ ❤️ <b>Likes:</b> {likes}
+│ 🎖️ <b>Badges:</b> {badges}
+│ 🔖 <b>Ob Version:</b> {ob_version}
+│ 📅 <b>Account Created:</b>
+│ {create_time}
+│ 🕐 <b>Last Login:</b>
+│ {last_login}
+│ 💎 <b>Diamond Cost:</b> {diamond_cost}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-╭━⟮ 🏅 <b>Rᴀɴᴋ Iɴꜰᴏ</b> ⟯
-│ 🎯 Bʀ Rᴀɴᴋ: {rank_br}
-│ 🏆 Bʀ Hɪɢʜᴇꜱᴛ Rᴀɴᴋ: {rank_br_high}
-│ 🎯 Bʀ Pᴏɪɴᴛꜱ: {br_points}
-│ ⚔️ Cꜱ Rᴀɴᴋ: {cs_rank}
-│ 🏆 Cꜱ Hɪɢʜᴇꜱᴛ Rᴀɴᴋ: {cs_rank_high}
-│ ⚔️ Cꜱ Pᴏɪɴᴛꜱ: {cs_points}
-╰━━━━━━━━━━━━━━━✪
+<blockquote>╭━⟮ 🏅 <b>Rank Info</b> ⟯
+│ 🎯 <b>Br Rank:</b> {rank_br}
+│ 🏆 <b>Br Highest Rank:</b> {rank_br_high}
+│ 🎯 <b>Br Points:</b> {br_points}
+│ ⚔️ <b>Cs Rank:</b> {cs_rank}
+│ 🏆 <b>Cs Highest Rank:</b> {cs_rank_high}
+│ ⚔️ <b>Cs Points:</b> {cs_points}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-╭━⟮ 💬 <b>Sᴏᴄɪᴀʟ Iɴꜰᴏ</b> ⟯
-│ 📝 Bɪᴏ: {bio}
-│ 🌐 Lᴀɴɢᴜᴀɢᴇ: {language}
-│ 🎮 Pʀᴇꜰᴇʀʀᴇᴅ Mᴏᴅᴇ: {pref_mode}
-╰━━━━━━━━━━━━━━━✪
+<blockquote>╭━⟮ 💬 <b>Social Info</b> ⟯
+│ 📝 <b>Bio:</b> {bio}
+│ 🌐 <b>Language:</b> {language}
+│ 🎮 <b>Preferred Mode:</b> {pref_mode}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-╭━⟮ 🏰 <b>Gᴜɪʟᴅ Iɴꜰᴏ</b> ⟯
-│ 🏯 Nᴀᴍᴇ: {guild_name}
-│ 🆔 Gᴜɪʟᴅ Iᴅ: {guild_id}
-│ 📶 Lᴇᴠᴇʟ: {guild_level}
-│ 👥 Mᴇᴍʙᴇʀꜱ: {guild_members}
-│ 👑 Cᴀᴘᴛᴀɪɴ: {guild_captain} ({gc_uid})
-╰━━━━━━━━━━━━━━━✪
+<blockquote>╭━⟮ 🏰 <b>Guild Info</b> ⟯
+│ 🏯 <b>Name:</b> {guild_name}
+│ 🆔 <b>Guild Id:</b> {guild_id}
+│ 📶 <b>Level:</b> {guild_level}
+│ 👥 <b>Members:</b> {guild_members}
+│ 👑 <b>Captain:</b> {guild_captain} ({gc_uid})
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-╭━⟮ 🐾 <b>Pᴇᴛ Iɴꜰᴏ</b> ⟯
-│ 🐶 Nᴀᴍᴇ: {pet_name}
-│ 📶 Lᴇᴠᴇʟ: {pet_level}
-│ ⭐ Exᴘ: {pet_exp}
-╰━━━━━━━━━━━━━━━✪
+<blockquote>╭━⟮ 🐾 <b>Pet Info</b> ⟯
+│ 🐶 <b>Name:</b> {pet_name}
+│ 📶 <b>Level:</b> {pet_level}
+│ ⭐ <b>Exp:</b> {pet_exp}
+╰━━━━━━━━━━━━━━━✪</blockquote>
 
-╭━⟮ 🛡️ <b>Cʀᴇᴅɪᴛ Sᴄᴏʀᴇ</b> ⟯
-│ 📊 Sᴄᴏʀᴇ: {credit_score}
-│ 🎁 Rᴇᴡᴀʀᴅ Sᴛᴀᴛᴇ: {credit_reward}
-╰━━━━━━━━━━━━━━━✪"""
+<blockquote>╭━⟮ 🛡️ <b>Credit Score</b> ⟯
+│ 📊 <b>Score:</b> {credit_score}
+│ 🎁 <b>Reward State:</b> {credit_reward}
+╰━━━━━━━━━━━━━━━✪</blockquote>"""
 
 # ===================== BOT HANDLERS =====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 <b>Welcome to Free Fire Info Bot!</b>\n\n"
-        "You can send a Free Fire UID directly OR use the command:\n"
-        "<code>/info 2722004155</code>\n\n"
-        "Example: <code>2722004155</code>",
+        "Send a Free Fire UID directly OR use:\n"
+        "<code>/info 2722004155</code>",
         parse_mode="HTML"
     )
 
@@ -197,30 +213,18 @@ async def process_uid(update: Update, uid: str):
             await wait_msg.edit_text("❌ <b>Player not found or API Server Busy!</b>", parse_mode="HTML")
             return
         formatted = format_player_info(data, uid)
-        
-        # HTML Parse Mode is bulletproof against fancy player names & symbols
         await wait_msg.edit_text(formatted, parse_mode="HTML")
     except Exception as e:
         logger.error(f"Error: {e}")
         await wait_msg.edit_text(f"❌ <b>Error:</b> <code>{html.escape(str(e))}</code>", parse_mode="HTML")
 
-# ===================== FLASK HEALTH CHECK =====================
-
-@app.route('/')
-def home():
-    return '✅ Free Fire Info Bot is running!', 200
-
-# ===================== RUN FLASK IN BACKGROUND =====================
-
 def run_flask():
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# ===================== MAIN =====================
-
 if __name__ == "__main__":
     if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN is missing!")
+        logger.error("❌ BOT_TOKEN environment variable is missing on Render!")
         exit(1)
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
@@ -234,7 +238,6 @@ if __name__ == "__main__":
     logger.info("✅ Bot is starting in polling mode...")
     app_bot = Application.builder().token(BOT_TOKEN).build()
     
-    # Handlers
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("info", info_command))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
