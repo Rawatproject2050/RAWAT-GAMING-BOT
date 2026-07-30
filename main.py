@@ -16,7 +16,12 @@ API_KEY = os.getenv("API_KEY", "FFINFO-Free")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Flask Web Server Setup (For Keeping Awake on Render/Cron-Job.org)
 app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is alive and running 24/7!", 200
 
 def fmt_num(val):
     if val is None or val == "?" or val == "" or val == "0":
@@ -37,7 +42,6 @@ def parse_time(ts, fmt="%Y-%m-%d"):
         return "Unknown"
     try:
         ts_int = int(ts)
-        # If timestamp is in milliseconds, convert to seconds
         if ts_int > 10000000000:
             ts_int = ts_int // 1000
         return datetime.fromtimestamp(ts_int).strftime(fmt)
@@ -67,6 +71,9 @@ def get_player_info(uid):
     return None
 
 def format_player_info(data, uid):
+    if not isinstance(data, dict):
+        return f"⚠️ <b>Error:</b> Invalid response received for UID <code>{uid}</code>"
+
     basic = data.get("basicInfo") or data.get("basic") or {}
     social = data.get("socialInfo") or data.get("social") or {}
     clan = data.get("clanBasicInfo") or data.get("clan") or {}
@@ -75,7 +82,6 @@ def format_player_info(data, uid):
     credit = data.get("creditScore") or data.get("credit") or {}
     region = data.get("region", basic.get("region", "IND"))
 
-    # Extracting Create Time & Last Login from multiple possible API JSON paths
     create_ts = (
         data.get("accountCreateTime") or basic.get("accountCreateTime") or
         data.get("createTime") or basic.get("createTime") or
@@ -94,7 +100,6 @@ def format_player_info(data, uid):
     likes          = safe_str(fmt_num(basic.get("liked") or basic.get("likeCount") or data.get("likes") or "?"))
     exp            = safe_str(fmt_num(basic.get("exp") or basic.get("experience") or data.get("exp") or "?"))
     
-    # Badges extraction
     badges_val     = data.get("badgeCount") or data.get("badges") or basic.get("badgeCount") or data.get("badge")
     badges         = safe_str(fmt_num(badges_val))
 
@@ -183,15 +188,12 @@ def format_player_info(data, uid):
 
 # ===================== BOT HANDLERS & ANALYTICS =====================
 
-# Admin Configuration
-ADMIN_ID = 6665529050  # 👈 Yaha apna Numeric Telegram ID daalein (e.g. 583920194)
+ADMIN_ID = 6665529050  
 ADMIN_USERNAME = "@the_rawat_boy_official"
 
-# Memory Storage for Bot Statistics
 user_data_store = {}
 connected_groups = set()
 
-# Helper function to track active users
 def track_user(user, chat_type):
     user_id = user.id
     first_name = user.first_name or ""
@@ -260,7 +262,6 @@ async def bot_admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
-    # Admin Access Control
     if user.id != ADMIN_ID:
         await update.message.reply_text("❌ <b>Yeh command sirf Bot Owner ke liye reserved hai!</b>", parse_mode="HTML")
         return
@@ -268,7 +269,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_users = len(user_data_store)
     total_groups = len(connected_groups)
 
-    # Top 5 Recent Users List
     recent_users = list(user_data_store.items())[-5:]
     recent_users.reverse()
     
@@ -300,21 +300,19 @@ async def handle_uid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await process_uid(update, uid)
 
 async def process_uid(update: Update, uid: str):
-    # Valid UID Check
     if not uid.isdigit() or len(uid) < 5 or len(uid) > 15:
         await update.message.reply_text(
-            "❌ <b>Player not found or API Server Busy!</b>", 
+            "⚠️ <b>Invalid UID Format!</b>\n"
+            "Kripya sahi Free Fire Player UID submit karein.", 
             parse_mode="HTML"
         )
         return
 
-    # Original Simple Message
     wait_msg = await update.message.reply_text(
-        "⏳ Request processing...", 
+        "⏳ <i>Request processing...</i>", 
         parse_mode="HTML"
     )
     
-    # API Request Processing
     data = None
     for attempt in range(3):
         try:
@@ -324,7 +322,6 @@ async def process_uid(update: Update, uid: str):
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} failed: {e}")
 
-    # Success Case
     if data:
         try:
             formatted = format_player_info(data, uid)
@@ -332,8 +329,6 @@ async def process_uid(update: Update, uid: str):
         except Exception as e:
             logger.error(f"Formatting Error: {e}")
             await wait_msg.edit_text("⚠️ <b>Data Formatting Error!</b> Try again later.", parse_mode="HTML")
-    
-    # Server Busy Case
     else:
         smart_error_msg = (
             "⚠️ <b>Server Traffic Notice</b>\n\n"
@@ -343,8 +338,7 @@ async def process_uid(update: Update, uid: str):
             f"🔄 <b>10 seconds baad try karein:</b> <code>/info {uid}</code>"
         )
         await wait_msg.edit_text(smart_error_msg, parse_mode="HTML")
-        
-# Function to Set Telegram Bot Menu Commands (Popup '/' Menu)
+
 async def post_init(application: Application):
     bot_commands = [
         ("start", "Bot ko restart karein"),
@@ -354,7 +348,7 @@ async def post_init(application: Application):
     await application.bot.set_my_commands(bot_commands)
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
@@ -362,6 +356,7 @@ if __name__ == "__main__":
         logger.error("❌ BOT_TOKEN environment variable is missing on Render!")
         exit(1)
 
+    # Web Server for keeping alive on Render/Cron-Job
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
@@ -372,27 +367,12 @@ if __name__ == "__main__":
 
     logger.info("✅ Bot is starting in polling mode...")
     
-    # Build Bot with post_init to register '/' menu
     app_bot = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # Register Handlers
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("info", info_command))
     app_bot.add_handler(CommandHandler("bot_admin", bot_admin_command))
     app_bot.add_handler(CommandHandler("stats", stats_command))
-    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
-    
-    app_bot.run_polling()
-    try:
-        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
-    except Exception:
-        pass
-
-    logger.info("✅ Bot is starting in polling mode...")
-    app_bot = Application.builder().token(BOT_TOKEN).build()
-    
-    app_bot.add_handler(CommandHandler("start", start))
-    app_bot.add_handler(CommandHandler("info", info_command))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid))
     
     app_bot.run_polling()
